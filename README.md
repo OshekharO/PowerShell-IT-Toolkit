@@ -2,7 +2,7 @@
 
 > **Tagline:** Diagnose. Repair. Keep Windows Running.
 
-A comprehensive, all-in-one diagnostic, repair, and maintenance PowerShell toolkit engineered for technical support professionals, sysadmins, and IT technicians. Collects system specs, inspects hardware, evaluates disk health, analyzes event logs, diagnoses network issues, performs Windows repairs, and generates consolidated reports.
+A comprehensive, all-in-one diagnostic, repair, and maintenance PowerShell toolkit engineered for technical support professionals, sysadmins, and IT technicians. Collects system specs, inspects hardware, evaluates disk health, analyzes event logs, diagnoses network issues, inspects security/encryption/TPM settings, audits startup items & user accounts, performs Windows repairs, and generates consolidated reports.
 
 ---
 
@@ -19,9 +19,11 @@ A comprehensive, all-in-one diagnostic, repair, and maintenance PowerShell toolk
 - **CHKDSK Scan:** Read-only health check for disk integrity on the C: volume.
 - **Firewall Status:** Status of Domain, Private, and Public firewall profiles along with enabled inbound rules summary.
 - **Windows Update History:** Displays installed hotfixes and update records sorted by installation date.
+- **Security Diagnostics:** Inspects Windows Defender status & real-time protection, BitLocker volume encryption, and TPM health.
+- **Startup & Accounts Info:** Audits startup applications (Registry & CIM), local user accounts, and members of the local Administrators group.
 - **Battery Report:** Generates an HTML battery health and capacity report via `powercfg /batteryreport`.
 - **Full Diagnostic Mode:** Runs all diagnostic functions sequentially and creates a timestamped report directory.
-- **Quick Maintenance Utilities:** Quick actions to Flush DNS, Reset Winsock & IP, Clear Temporary Files, and Restart Print Spooler.
+- **Quick Maintenance Utilities:** Quick actions to Flush DNS, Release & Renew IP, Reset Winsock & IP, Clear Temporary Files, Purge Print Queue & Restart Spooler, and Restart Windows Update Services.
 - **Open Report Folder:** Fast 1-click access to all generated reports.
 - **Task Scheduler Integration:** Automated daily diagnostic task setup via Task Scheduler.
 
@@ -32,7 +34,7 @@ A comprehensive, all-in-one diagnostic, repair, and maintenance PowerShell toolk
 ### Prerequisites
 - **Operating System:** Windows 10, Windows 11, or Windows Server 2016+
 - **PowerShell Version:** Windows PowerShell 5.1 or PowerShell 7+
-- **Privileges:** Administrator privileges required for full functionality (DISM, SFC, Event Logs, Firewall).
+- **Privileges:** Administrator privileges required for full functionality (DISM, SFC, Event Logs, Firewall, BitLocker, Defender, TPM).
 
 ### Usage Instructions
 
@@ -58,13 +60,17 @@ Each session creates a timestamped folder on the current user's Desktop:
 
 It contains:
 - `Technician_Log.txt` - Complete log of all actions executed during the session.
-- `SystemInfo.txt` & `ComputerInfo.txt` - Operating system and system architecture details.
+- `SystemInfo.txt` & `ComputerInfo.txt` & `OperatingSystem.txt` - Operating system and system architecture details.
 - `HardwareInfo.txt` - CPU, RAM layout, GPU, and motherboard specs.
 - `DiskHealth.txt` - Drive space and SMART status.
 - `InstalledSoftware.csv` - Full inventory of installed programs.
 - `NetworkDiagnostics.txt` - Adapter details, ping results, DNS, routes, and listening ports.
 - `EventLogs_RecentErrors.txt` - Critical/Error logs from Application, System, and Security.
 - `Services.txt` & `TopProcesses.txt` - Service states and top resource-consuming processes.
+- `FirewallStatus.txt` - Active firewall profiles and enabled inbound rules.
+- `WindowsUpdateHistory.txt` - Installed hotfixes and update records.
+- `SecurityDiagnostics.txt` - Windows Defender, BitLocker encryption, and TPM status.
+- `StartupAndAccountInfo.txt` - Local accounts, local admin group members, and startup applications.
 - `WindowsRepair.txt` - Logs from DISM and SFC scans.
 - `BatteryReport.html` - Comprehensive laptop battery analytics.
 
@@ -74,7 +80,7 @@ It contains:
 
 You can schedule the script to run daily at 8:00 AM automatically:
 1. Launch `SysAdmin_Toolkit.ps1`.
-2. Select **[15] Schedule Daily Task**.
+2. Select **[17] Schedule Daily Task**.
 3. The script will register `SysAdmin_Toolkit_Daily_Diagnostics` in Task Scheduler using `-AutoRun`.
 
 ---
