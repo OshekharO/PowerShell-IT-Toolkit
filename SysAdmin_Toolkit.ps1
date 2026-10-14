@@ -631,7 +631,7 @@ function Add-ScheduledTaskHelper {
     $ScriptPath = $MyInvocation.MyCommand.Definition
 
     if (-not $ScriptPath) {
-        $ScriptPath = Join-Path $PSScriptRoot "PowerShell_IT_Toolkit.ps1"
+        $ScriptPath = Join-Path $PSScriptRoot "SysAdmin_Toolkit.ps1"
     }
 
     try {

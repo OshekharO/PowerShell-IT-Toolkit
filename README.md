@@ -1,4 +1,4 @@
-# SysAdmin Toolkit (PowerShell IT Toolkit)
+# SysAdmin Toolkit
 
 > **Tagline:** Diagnose. Repair. Keep Windows Running.
 
@@ -46,8 +46,6 @@ A comprehensive, all-in-one diagnostic, repair, and maintenance PowerShell toolk
 
 3. **Run the Script:**
    ```powershell
-   .\PowerShell_IT_Toolkit.ps1
-   # OR
    .\SysAdmin_Toolkit.ps1
    ```
 
@@ -75,7 +73,7 @@ It contains:
 ## 🤖 Automating with Task Scheduler
 
 You can schedule the script to run daily at 8:00 AM automatically:
-1. Launch `PowerShell_IT_Toolkit.ps1`.
+1. Launch `SysAdmin_Toolkit.ps1`.
 2. Select **[15] Schedule Daily Task**.
 3. The script will register `SysAdmin_Toolkit_Daily_Diagnostics` in Task Scheduler using `-AutoRun`.
 
