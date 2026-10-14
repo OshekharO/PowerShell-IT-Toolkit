@@ -466,6 +466,138 @@ function Get-WindowsUpdateHistory {
 }
 
 # ==============================================================================
+function Get-SecurityDiagnostics {
+    Write-Host "`n[+] Checking Security Diagnostics (Defender, BitLocker, TPM)..." -ForegroundColor Cyan
+    Write-Log "Starting Security Diagnostics check..."
+
+    $SecPath = Join-Path $WorkDir "SecurityDiagnostics.txt"
+
+    try {
+        $SecReport = @()
+        $SecReport += "=========================================="
+        $SecReport += "           SECURITY DIAGNOSTICS           "
+        $SecReport += "=========================================="
+        $SecReport += ""
+
+        # Windows Defender Status
+        $SecReport += "--- WINDOWS DEFENDER STATUS ---"
+        try {
+            $MpStatus = Get-MpComputerStatus -ErrorAction Stop
+            $SecReport += "Antivirus Enabled: $($MpStatus.AntivirusEnabled)"
+            $SecReport += "Real Time Protection Enabled: $($MpStatus.RealTimeProtectionEnabled)"
+            $SecReport += "Antivirus Signature Age (Days): $($MpStatus.AntivirusSignatureAge)"
+            $SecReport += "Antivirus Signature Version: $($MpStatus.AVSignatureVersion)"
+            $SecReport += "Quick Scan Age (Days): $($MpStatus.QuickScanAge)"
+            $SecReport += "Full Scan Age (Days): $($MpStatus.FullScanAge)"
+        } catch {
+            $SecReport += "Unable to query Get-MpComputerStatus or third-party AV active."
+        }
+        $SecReport += ""
+
+        # BitLocker Drive Encryption
+        $SecReport += "--- BITLOCKER ENCRYPTION STATUS ---"
+        try {
+            $BitLockerVols = Get-BitLockerVolume -ErrorAction Stop
+            foreach ($vol in $BitLockerVols) {
+                $SecReport += "Mount Point: $($vol.MountPoint) | Protection Status: $($vol.ProtectionStatus) | Encryption Percentage: $($vol.EncryptionPercentage)%"
+                $SecReport += "  Volume Type: $($vol.VolumeType) | Encryption Method: $($vol.EncryptionMethod)"
+            }
+        } catch {
+            $SecReport += "BitLocker status unavailable or command not supported on this OS edition."
+        }
+        $SecReport += ""
+
+        # TPM (Trusted Platform Module) Status
+        $SecReport += "--- TPM HEALTH STATUS ---"
+        try {
+            $Tpm = Get-Tpm -ErrorAction Stop
+            $SecReport += "TPM Present: $($Tpm.TpmPresent)"
+            $SecReport += "TPM Ready: $($Tpm.TpmReady)"
+            $SecReport += "TPM Enabled: $($Tpm.TpmEnabled)"
+            $SecReport += "TPM Activated: $($Tpm.TpmActivated)"
+            $SecReport += "Manufacturer Id: $($Tpm.ManufacturerId)"
+        } catch {
+            $SecReport += "TPM information unavailable or not detected."
+        }
+
+        $SecReport | Out-File -FilePath $SecPath -Encoding utf8
+        Write-Host " [✓] Security diagnostics report saved to $SecPath" -ForegroundColor Green
+        Write-Log "Security Diagnostics checked successfully."
+    } catch {
+        Write-Host " [!] Error checking Security Diagnostics: $_" -ForegroundColor Red
+        Write-Log "Error checking Security Diagnostics: $_" "ERROR"
+    }
+}
+
+function Get-StartupAndAccountInfo {
+    Write-Host "`n[+] Collecting Startup Apps & User Account Info..." -ForegroundColor Cyan
+    Write-Log "Starting Startup Apps & User Account Info collection..."
+
+    $StartAccPath = Join-Path $WorkDir "StartupAndAccountInfo.txt"
+
+    try {
+        $Report = @()
+        $Report += "=========================================="
+        $Report += "     STARTUP APPS & USER ACCOUNTS INFO    "
+        $Report += "=========================================="
+        $Report += ""
+
+        # Local User Accounts
+        $Report += "--- LOCAL USER ACCOUNTS ---"
+        try {
+            $Users = Get-LocalUser -ErrorAction SilentlyContinue
+            if ($Users) {
+                foreach ($u in $Users) {
+                    $Report += "Username: $($u.Name) | Enabled: $($u.Enabled) | LastLogon: $($u.LastLogon) | PasswordRequired: $($u.PasswordRequired)"
+                }
+            } else {
+                $Report += (Get-CimInstance Win32_UserAccount -Filter "LocalAccount=True" | Select-Object Name, Disabled, PasswordRequired | Format-Table -AutoSize | Out-String)
+            }
+        } catch {
+            $Report += "Unable to list local users."
+        }
+        $Report += ""
+
+        # Local Administrators Group Members
+        $Report += "--- LOCAL ADMINS GROUP MEMBERS ---"
+        try {
+            $Admins = Get-LocalGroupMember -Group "Administrators" -ErrorAction SilentlyContinue
+            if ($Admins) {
+                foreach ($a in $Admins) {
+                    $Report += "Member: $($a.Name) | ObjectClass: $($a.ObjectClass) | PrincipalSource: $($a.PrincipalSource)"
+                }
+            } else {
+                $Report += "Unable to query local Administrators group."
+            }
+        } catch {
+            $Report += "Unable to query local Administrators group."
+        }
+        $Report += ""
+
+        # Startup Applications (Registry + Startup Folder)
+        $Report += "--- STARTUP APPLICATIONS (REGISTRY & CIM) ---"
+        try {
+            $CimStartup = Get-CimInstance Win32_StartupCommand -ErrorAction SilentlyContinue
+            if ($CimStartup) {
+                foreach ($s in $CimStartup) {
+                    $Report += "Name: $($s.Name) | Command: $($s.Command) | Location: $($s.Location) | User: $($s.User)"
+                }
+            } else {
+                $Report += "No startup items found via Win32_StartupCommand."
+            }
+        } catch {
+            $Report += "Unable to query startup commands."
+        }
+
+        $Report | Out-File -FilePath $StartAccPath -Encoding utf8
+        Write-Host " [✓] Startup apps & user account info saved to $StartAccPath" -ForegroundColor Green
+        Write-Log "Startup Apps & User Account Info collected successfully."
+    } catch {
+        Write-Host " [!] Error collecting Startup & Account Info: $_" -ForegroundColor Red
+        Write-Log "Error collecting Startup & Account Info: $_" "ERROR"
+    }
+}
+
 # SECTION 3: REPAIR, MAINTENANCE & UTILITY FUNCTIONS
 # ==============================================================================
 
@@ -557,6 +689,13 @@ function Invoke-MaintenanceUtilities {
             ipconfig /flushdns | Out-Null
             Write-Host " [✓] DNS Cache successfully flushed." -ForegroundColor Green
         }
+        "ReleaseRenewIP" {
+            Write-Host "`n[+] Releasing and Renewing IP Address..." -ForegroundColor Cyan
+            Write-Log "Releasing and Renewing IP Address..."
+            ipconfig /release | Out-Null
+            ipconfig /renew | Out-Null
+            Write-Host " [✓] IP Address lease successfully released and renewed." -ForegroundColor Green
+        }
         "ResetWinsock" {
             Write-Host "`n[+] Resetting Winsock & IP Stack..." -ForegroundColor Cyan
             Write-Log "Resetting Winsock catalog..."
@@ -576,11 +715,26 @@ function Invoke-MaintenanceUtilities {
             }
             Write-Host " [✓] Temporary files cleared." -ForegroundColor Green
         }
-        "RestartSpooler" {
-            Write-Host "`n[+] Restarting Print Spooler Service..." -ForegroundColor Cyan
-            Write-Log "Restarting Print Spooler..."
-            Restart-Service -Name "Spooler" -Force -ErrorAction SilentlyContinue
-            Write-Host " [✓] Print Spooler service restarted." -ForegroundColor Green
+        "PurgePrintQueue" {
+            Write-Host "`n[+] Purging Print Queue & Restarting Spooler..." -ForegroundColor Cyan
+            Write-Log "Purging Print Queue..."
+            Stop-Service -Name "Spooler" -Force -ErrorAction SilentlyContinue
+            $SpoolDir = "$env:SystemRoot\System32\spool\PRINTERS"
+            if (Test-Path $SpoolDir) {
+                Get-ChildItem -Path $SpoolDir -Recurse -Force -ErrorAction SilentlyContinue |
+                    Remove-Item -Force -ErrorAction SilentlyContinue
+            }
+            Start-Service -Name "Spooler" -ErrorAction SilentlyContinue
+            Write-Host " [✓] Print queue purged and Spooler service restarted." -ForegroundColor Green
+        }
+        "RestartUpdateServices" {
+            Write-Host "`n[+] Restarting Windows Update Services..." -ForegroundColor Cyan
+            Write-Log "Restarting Windows Update services..."
+            $WuServices = @("wuauserv", "bits", "cryptsvc")
+            foreach ($svc in $WuServices) {
+                Restart-Service -Name $svc -Force -ErrorAction SilentlyContinue
+            }
+            Write-Host " [✓] Windows Update services (wuauserv, bits, cryptsvc) restarted." -ForegroundColor Green
         }
     }
 }
@@ -600,6 +754,8 @@ function Invoke-FullDiagnosticMode {
     Get-ServicesAndProcesses
     Get-FirewallStatus
     Get-WindowsUpdateHistory
+    Get-SecurityDiagnostics
+    Get-StartupAndAccountInfo
     Get-BatteryReport
 
     Write-Host "`n=========================================================================" -ForegroundColor Green
@@ -676,16 +832,18 @@ function Show-MainUI {
         Write-Host " [9]  CHKDSK Scan              (Read-only volume health check)" -ForegroundColor White
         Write-Host " [10] Firewall Status          (Firewall Profiles & Rules Summary)" -ForegroundColor White
         Write-Host " [11] Windows Update History   (Hotfix list & installed update history)" -ForegroundColor White
-        Write-Host " [12] Battery Report           (Laptop battery health HTML report)" -ForegroundColor White
+        Write-Host " [12] Security Diagnostics     (Windows Defender, BitLocker, TPM status)" -ForegroundColor White
+        Write-Host " [13] Startup & Accounts Info  (Local Users, Admins, Startup applications)" -ForegroundColor White
+        Write-Host " [14] Battery Report           (Laptop battery health HTML report)" -ForegroundColor White
         Write-Host "------------------------------------------------------------------------" -ForegroundColor DarkGray
-        Write-Host " [13] FULL DIAGNOSTIC MODE     (Run all diagnostic checks at once)" -ForegroundColor Yellow
-        Write-Host " [14] Quick Utilities          (Flush DNS, Reset Winsock, Clear Temp, Spooler)" -ForegroundColor Green
-        Write-Host " [15] Schedule Daily Task      (Automate script via Task Scheduler)" -ForegroundColor Green
-        Write-Host " [16] Open Report Folder       (Quick access to generated reports)" -ForegroundColor Green
+        Write-Host " [15] FULL DIAGNOSTIC MODE     (Run all diagnostic checks at once)" -ForegroundColor Yellow
+        Write-Host " [16] Quick Utilities          (Flush DNS, Release/Renew IP, Reset Winsock, Clear Temp, Print Queue, WU Services)" -ForegroundColor Green
+        Write-Host " [17] Schedule Daily Task      (Automate script via Task Scheduler)" -ForegroundColor Green
+        Write-Host " [18] Open Report Folder       (Quick access to generated reports)" -ForegroundColor Green
         Write-Host " [0]  Exit Toolkit" -ForegroundColor Red
         Write-Host "========================================================================" -ForegroundColor Blue
 
-        $Selection = Read-Host "Select an option [0-16]"
+        $Selection = Read-Host "Select an option [0-18]"
 
         switch ($Selection) {
             "1"  { Get-SystemInformation; Pause }
@@ -699,25 +857,31 @@ function Show-MainUI {
             "9"  { Invoke-CHKDSKScan; Pause }
             "10" { Get-FirewallStatus; Pause }
             "11" { Get-WindowsUpdateHistory; Pause }
-            "12" { Get-BatteryReport; Pause }
-            "13" { Invoke-FullDiagnosticMode; Pause }
-            "14" {
+            "12" { Get-SecurityDiagnostics; Pause }
+            "13" { Get-StartupAndAccountInfo; Pause }
+            "14" { Get-BatteryReport; Pause }
+            "15" { Invoke-FullDiagnosticMode; Pause }
+            "16" {
                 Write-Host "`nSelect Utility Action:" -ForegroundColor Cyan
-                Write-Host " [A] Flush DNS"
-                Write-Host " [B] Reset Winsock & IP"
-                Write-Host " [C] Clear Temp Files"
-                Write-Host " [D] Restart Print Spooler"
+                Write-Host " [A] Flush DNS Cache"
+                Write-Host " [B] Release & Renew IP Address"
+                Write-Host " [C] Reset Winsock & IP Stack"
+                Write-Host " [D] Clear Temporary Files"
+                Write-Host " [E] Purge Print Queue & Restart Spooler"
+                Write-Host " [F] Restart Windows Update Services"
                 $SubChoice = Read-Host "Choice"
                 switch ($SubChoice.ToUpper()) {
                     "A" { Invoke-MaintenanceUtilities -Action "FlushDNS" }
-                    "B" { Invoke-MaintenanceUtilities -Action "ResetWinsock" }
-                    "C" { Invoke-MaintenanceUtilities -Action "ClearTemp" }
-                    "D" { Invoke-MaintenanceUtilities -Action "RestartSpooler" }
+                    "B" { Invoke-MaintenanceUtilities -Action "ReleaseRenewIP" }
+                    "C" { Invoke-MaintenanceUtilities -Action "ResetWinsock" }
+                    "D" { Invoke-MaintenanceUtilities -Action "ClearTemp" }
+                    "E" { Invoke-MaintenanceUtilities -Action "PurgePrintQueue" }
+                    "F" { Invoke-MaintenanceUtilities -Action "RestartUpdateServices" }
                 }
                 Pause
             }
-            "15" { Add-ScheduledTaskHelper; Pause }
-            "16" { Open-ReportFolder; Pause }
+            "17" { Add-ScheduledTaskHelper; Pause }
+            "18" { Open-ReportFolder; Pause }
             "0"  { Write-Host "Exiting SysAdmin Toolkit. Goodbye!" -ForegroundColor Cyan; break }
             default { Write-Host "Invalid selection. Please try again." -ForegroundColor Red; Start-Sleep -Seconds 1 }
         }
