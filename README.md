@@ -2,7 +2,7 @@
 
 > **Tagline:** Diagnose. Repair. Keep Windows Running.
 
-A comprehensive, all-in-one diagnostic, repair, and maintenance PowerShell toolkit engineered for technical support professionals, sysadmins, and IT technicians. Collects system specs, inspects hardware, evaluates disk health, analyzes event logs, diagnoses network issues, inspects security/encryption/TPM settings, audits startup items & user accounts, performs Windows repairs, and generates consolidated reports.
+A comprehensive, all-in-one diagnostic, repair, and maintenance PowerShell toolkit engineered for technical support professionals, sysadmins, and IT technicians. Collects system specs, inspects hardware, evaluates disk health, audits device drivers, inspects SMB network shares, analyzes event logs, diagnoses local and extended network issues, inspects security/encryption/TPM settings, audits startup items & user accounts, performs Windows repairs, and generates consolidated reports.
 
 ![SysAdmin Toolkit Interactive Menu](image.png)
 
@@ -13,10 +13,13 @@ A comprehensive, all-in-one diagnostic, repair, and maintenance PowerShell toolk
 - **System Information:** Collects OS build, architecture, computer model, serial number, uptime, and registered user info.
 - **Hardware Information:** Detailed specifications for CPU (cores, clock speed), RAM (slots, capacity, speed), Motherboard, and GPU (resolution, driver version).
 - **Disk Health & Storage:** Logical volume space usage and physical disk SMART health status.
+- **Device Driver Diagnostics:** Audits Plug and Play (PnP) hardware devices for driver errors, missing drivers, and hardware issues (`Win32_PnPEntity`).
 - **Network Diagnostics:** IP configuration, active network adapters, ICMP ping tests, DNS server checks, routing table, ARP cache, and listening ports.
+- **Extended Network Check:** Public IP address lookup, WAN domain resolution & latency checks, and Hosts file (`C:\Windows\System32\drivers\etc\hosts`) security audit for unauthorized redirects.
+- **SMB Shares & Security:** Audits active network shares, active SMB connections, and checks if insecure SMBv1 protocol is enabled.
 - **Event Logs:** Queries recent Critical and Error entries across System, Application, and Security logs.
 - **Services & Processes:** Identifies stopped automatic services and highlights top CPU and Memory consuming processes.
-- **Installed Software:** Generates a full inventory of installed software and exports to CSV.
+- **Installed Software:** Generates a full inventory of installed software and exports to CSV and TXT formats.
 - **Windows Repair:** Executes `DISM /Online /Cleanup-Image /RestoreHealth` and System File Checker (`sfc /scannow`).
 - **CHKDSK Scan:** Read-only health check for disk integrity on the C: volume.
 - **Firewall Status:** Status of Domain, Private, and Public firewall profiles along with enabled inbound rules summary.
@@ -24,8 +27,8 @@ A comprehensive, all-in-one diagnostic, repair, and maintenance PowerShell toolk
 - **Security Diagnostics:** Inspects Windows Defender status & real-time protection, BitLocker volume encryption, and TPM health.
 - **Startup & Accounts Info:** Audits startup applications (Registry & CIM), local user accounts, and members of the local Administrators group.
 - **Battery Report:** Generates an HTML battery health and capacity report via `powercfg /batteryreport`.
-- **Full Diagnostic Mode:** Runs all diagnostic functions sequentially and creates a timestamped report directory.
-- **Quick Maintenance Utilities:** Quick actions to Flush DNS, Release & Renew IP, Reset Winsock & IP, Clear Temporary Files, Purge Print Queue & Restart Spooler, and Restart Windows Update Services.
+- **Full Diagnostic Mode:** Runs all 15 diagnostic functions sequentially and creates a timestamped report directory.
+- **Quick Maintenance Utilities:** Quick actions to Flush DNS, Release & Renew IP, Reset Winsock & IP, Clear Temporary Files & Recycle Bin, Purge Print Queue & Restart Spooler, Restart Windows Update Services, Create System Restore Point, Update Windows Defender Signatures, and Reset Windows Update Cache (`SoftwareDistribution`).
 - **Open Report Folder:** Fast 1-click access to all generated reports.
 - **Task Scheduler Integration:** Automated daily diagnostic task setup via Task Scheduler.
 
@@ -36,7 +39,7 @@ A comprehensive, all-in-one diagnostic, repair, and maintenance PowerShell toolk
 ### Prerequisites
 - **Operating System:** Windows 10, Windows 11, or Windows Server 2016+
 - **PowerShell Version:** Windows PowerShell 5.1 or PowerShell 7+
-- **Privileges:** Administrator privileges required for full functionality (DISM, SFC, Event Logs, Firewall, BitLocker, Defender, TPM).
+- **Privileges:** Administrator privileges required for full functionality (DISM, SFC, Event Logs, Firewall, BitLocker, Defender, TPM, System Restore).
 
 ### Usage Instructions
 
@@ -76,8 +79,11 @@ It contains:
 - `SystemInfo.txt` & `ComputerInfo.txt` & `OperatingSystem.txt` - Operating system and system architecture details.
 - `HardwareInfo.txt` - CPU, RAM layout, GPU, and motherboard specs.
 - `DiskHealth.txt` - Drive space and SMART status.
-- `InstalledSoftware.csv` - Full inventory of installed programs.
+- `DriverDiagnostics.txt` - Device Manager / PnP hardware driver status and error codes.
+- `InstalledSoftware.csv` & `InstalledSoftware.txt` - Full inventory of installed programs.
 - `NetworkDiagnostics.txt` - Adapter details, ping results, DNS, routes, and listening ports.
+- `NetworkExtended.txt` - External Public IP, WAN DNS resolution, and Hosts file security audit.
+- `SmbDiagnostics.txt` - SMB shares, active sessions, and SMBv1 security status.
 - `EventLogs_RecentErrors.txt` - Critical/Error logs from Application, System, and Security.
 - `Services.txt` & `TopProcesses.txt` - Service states and top resource-consuming processes.
 - `FirewallStatus.txt` - Active firewall profiles and enabled inbound rules.
@@ -93,7 +99,7 @@ It contains:
 
 You can schedule the script to run daily at 8:00 AM automatically:
 1. Launch `SysAdmin_Toolkit.ps1`.
-2. Select **[17] Schedule Daily Task**.
+2. Select **[20] Schedule Daily Task**.
 3. The script will register `SysAdmin_Toolkit_Daily_Diagnostics` in Task Scheduler using `-AutoRun`.
 
 ---

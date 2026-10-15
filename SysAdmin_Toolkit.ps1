@@ -1,10 +1,10 @@
-﻿# ==============================================================================
+# ==============================================================================
 # SYSADMIN TOOLKIT - FULL IT TECHNICIAN TOOLKIT
 # Tagline: Diagnose. Repair. Keep Windows Running.
-# Version: 1.0.0
+# Version: 1.1.0
 # Description: All-in-one diagnostic, repair, and maintenance toolkit for Windows systems.
 #              Collects system info, hardware details, scans disks, gathers logs,
-#              performs Windows repairs, and more.
+#              performs Windows repairs, audits drivers, SMB shares, and more.
 # ==============================================================================
 
 # Ensure script runs as Administrator; attempt auto-elevation if interactive
@@ -237,6 +237,53 @@ function Get-InstalledSoftware {
     }
 }
 
+function Get-DriverDiagnostics {
+    Write-Host "`n[+] Checking Device Drivers & PnP Hardware Health..." -ForegroundColor Cyan
+    Write-Log "Starting Device Driver & PnP Hardware Health audit..."
+
+    $DriverPath = Join-Path $WorkDir "DriverDiagnostics.txt"
+
+    try {
+        $DriverReport = @()
+        $DriverReport += "=========================================="
+        $DriverReport += "     DEVICE DRIVER & PNP HEALTH AUDIT     "
+        $DriverReport += "=========================================="
+        $DriverReport += ""
+
+        # Query PnP Entities with errors or issues
+        $ProblemDevices = Get-CimInstance Win32_PnPEntity | Where-Object { $_.ConfigManagerErrorCode -ne 0 -or $_.Status -ne "OK" }
+
+        if ($ProblemDevices) {
+            $DriverReport += "--- DEVICES WITH DRIVER ERRORS OR ISSUES ---"
+            foreach ($dev in $ProblemDevices) {
+                $DriverReport += "Device Name   : $($dev.Name)"
+                $DriverReport += "Device ID     : $($dev.DeviceID)"
+                $DriverReport += "Error Code    : $($dev.ConfigManagerErrorCode)"
+                $DriverReport += "Status        : $($dev.Status)"
+                $DriverReport += "PNP Class     : $($dev.PNPClass)"
+                $DriverReport += "Manufacturer  : $($dev.Manufacturer)"
+                $DriverReport += "------------------------------------------"
+            }
+        } else {
+            $DriverReport += " [OK] All Plug and Play devices are functioning normally (No ConfigManager errors detected)."
+        }
+        $DriverReport += ""
+
+        # Summary of installed driver packages/signed state sample
+        $DriverReport += "--- DRIVER SUMMARY & PROBLEM SUMMARY ---"
+        $TotalPnP = (Get-CimInstance Win32_PnPEntity).Count
+        $DriverReport += "Total PnP Devices Enumerated: $TotalPnP"
+        $DriverReport += "Problem Devices Found      : $($ProblemDevices.Count)"
+
+        $DriverReport | Out-File -FilePath $DriverPath -Encoding utf8
+        Write-Host " [OK] Driver diagnostics report saved to $DriverPath" -ForegroundColor Green
+        Write-Log "Driver diagnostics completed successfully."
+    } catch {
+        Write-Host " [!] Error checking Device Drivers: $_" -ForegroundColor Red
+        Write-Log "Error checking Device Drivers: $_" "ERROR"
+    }
+}
+
 # ==============================================================================
 # SECTION 2: NETWORK, LOGGING, AND MONITORING FUNCTIONS
 # ==============================================================================
@@ -309,6 +356,73 @@ function Get-NetworkDiagnostics {
     } catch {
         Write-Host " [!] Error running Network Diagnostics: $_" -ForegroundColor Red
         Write-Log "Error running Network Diagnostics: $_" "ERROR"
+    }
+}
+
+function Get-NetworkExtendedInfo {
+    Write-Host "`n[+] Checking Public IP & Hosts File Security..." -ForegroundColor Cyan
+    Write-Log "Starting Extended Network & Hosts File inspection..."
+
+    $NetExtPath = Join-Path $WorkDir "NetworkExtended.txt"
+
+    try {
+        $Report = @()
+        $Report += "=========================================="
+        $Report += "   EXTENDED NETWORK & HOSTS FILE CHECK    "
+        $Report += "=========================================="
+        $Report += ""
+
+        # Public IP Detection
+        $Report += "--- EXTERNAL / PUBLIC IP ADDRESS ---"
+        try {
+            $PublicIp = (Invoke-RestMethod -Uri "https://api.ipify.org?format=json" -TimeoutSec 5 -ErrorAction Stop).ip
+            $Report += "Public IP Address: $PublicIp"
+        } catch {
+            try {
+                $PublicIp = (Invoke-RestMethod -Uri "https://ifconfig.me/ip" -TimeoutSec 5 -ErrorAction Stop).Trim()
+                $Report += "Public IP Address: $PublicIp"
+            } catch {
+                $Report += "Public IP Address: Unable to retrieve (Offline or blocked)"
+            }
+        }
+        $Report += ""
+
+        # Hosts File Audit
+        $Report += "--- HOSTS FILE AUDIT ---"
+        $HostsFilePath = "$env:SystemRoot\System32\drivers\etc\hosts"
+        if (Test-Path $HostsFilePath) {
+            $HostsContent = Get-Content -Path $HostsFilePath | Where-Object { $_ -notmatch '^\s*#' -and $_ -match '\S' }
+            if ($HostsContent) {
+                $Report += "Custom / Non-Comment Hosts Entries Found:"
+                foreach ($line in $HostsContent) {
+                    $Report += "  $line"
+                }
+            } else {
+                $Report += " [OK] Hosts file contains only default comments (No custom redirects)."
+            }
+        } else {
+            $Report += " [!] Hosts file not found at $HostsFilePath"
+        }
+        $Report += ""
+
+        # WAN DNS Resolution & Latency
+        $Report += "--- WAN DOMAIN RESOLUTION & LATENCY ---"
+        $Targets = @("microsoft.com", "cloudflare.com")
+        foreach ($t in $Targets) {
+            try {
+                $IPs = [System.Net.Dns]::GetHostAddresses($t) | ForEach-Object { $_.IPAddressToString }
+                $Report += "Domain: $t -> IPs: $($IPs -join ', ')"
+            } catch {
+                $Report += "Domain: $t -> Resolution Failed"
+            }
+        }
+
+        $Report | Out-File -FilePath $NetExtPath -Encoding utf8
+        Write-Host " [OK] Extended network info saved to $NetExtPath" -ForegroundColor Green
+        Write-Log "Extended network info collected successfully."
+    } catch {
+        Write-Host " [!] Error gathering Extended Network Info: $_" -ForegroundColor Red
+        Write-Log "Error gathering Extended Network Info: $_" "ERROR"
     }
 }
 
@@ -465,7 +579,6 @@ function Get-WindowsUpdateHistory {
     }
 }
 
-# ==============================================================================
 function Get-SecurityDiagnostics {
     Write-Host "`n[+] Checking Security Diagnostics (Defender, BitLocker, TPM)..." -ForegroundColor Cyan
     Write-Log "Starting Security Diagnostics check..."
@@ -526,6 +639,87 @@ function Get-SecurityDiagnostics {
     } catch {
         Write-Host " [!] Error checking Security Diagnostics: $_" -ForegroundColor Red
         Write-Log "Error checking Security Diagnostics: $_" "ERROR"
+    }
+}
+
+function Get-SmbDiagnostics {
+    Write-Host "`n[+] Auditing SMB Network Shares & Security Protocol..." -ForegroundColor Cyan
+    Write-Log "Starting SMB Diagnostics audit..."
+
+    $SmbPath = Join-Path $WorkDir "SmbDiagnostics.txt"
+
+    try {
+        $SmbReport = @()
+        $SmbReport += "=========================================="
+        $SmbReport += "    SMB SHARES & PROTOCOL SECURITY AUDIT  "
+        $SmbReport += "=========================================="
+        $SmbReport += ""
+
+        # Active Network Shares
+        $SmbReport += "--- ACTIVE NETWORK SHARES ---"
+        try {
+            $Shares = Get-SmbShare -ErrorAction SilentlyContinue
+            if ($Shares) {
+                foreach ($share in $Shares) {
+                    $SmbReport += "Name: $($share.Name) | Path: $($share.Path) | Description: $($share.Description) | ScopeName: $($share.ScopeName)"
+                }
+            } else {
+                $WmiShares = Get-CimInstance Win32_Share
+                foreach ($ws in $WmiShares) {
+                    $SmbReport += "Name: $($ws.Name) | Path: $($ws.Path) | Description: $($ws.Description)"
+                }
+            }
+        } catch {
+            $SmbReport += "Unable to query SMB shares."
+        }
+        $SmbReport += ""
+
+        # Active SMB Sessions
+        $SmbReport += "--- ACTIVE SMB SESSIONS ---"
+        try {
+            $Sessions = Get-SmbSession -ErrorAction SilentlyContinue
+            if ($Sessions) {
+                foreach ($sess in $Sessions) {
+                    $SmbReport += "ClientIP: $($sess.ClientComputerName) | User: $($sess.ClientUserName) | NumOpens: $($sess.NumOpens)"
+                }
+            } else {
+                $SmbReport += "No active inbound SMB sessions."
+            }
+        } catch {
+            $SmbReport += "Unable to query SMB sessions."
+        }
+        $SmbReport += ""
+
+        # SMBv1 Security Check
+        $SmbReport += "--- SMBv1 PROTOCOL STATUS (SECURITY CHECK) ---"
+        try {
+            $Smb1Config = Get-SmbServerConfiguration -ErrorAction SilentlyContinue
+            if ($Smb1Config) {
+                $Smb1Enabled = $Smb1Config.EnableSMB1Protocol
+                $SmbReport += "SMBv1 Protocol Enabled: $Smb1Enabled"
+                if ($Smb1Enabled) {
+                    $SmbReport += " [!] WARNING: SMBv1 is enabled on this system. It is considered insecure and vulnerable to WannaCry/EternalBlue."
+                } else {
+                    $SmbReport += " [OK] SMBv1 is disabled (Secure)."
+                }
+            } else {
+                $RegSmb1 = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters" -Name "SMB1" -ErrorAction SilentlyContinue).SMB1
+                if ($RegSmb1 -eq 0) {
+                    $SmbReport += " [OK] SMBv1 is disabled via Registry."
+                } else {
+                    $SmbReport += "SMBv1 registry state: $RegSmb1"
+                }
+            }
+        } catch {
+            $SmbReport += "Unable to inspect SMBv1 protocol configuration."
+        }
+
+        $SmbReport | Out-File -FilePath $SmbPath -Encoding utf8
+        Write-Host " [OK] SMB diagnostics saved to $SmbPath" -ForegroundColor Green
+        Write-Log "SMB diagnostics completed successfully."
+    } catch {
+        Write-Host " [!] Error checking SMB Diagnostics: $_" -ForegroundColor Red
+        Write-Log "Error checking SMB Diagnostics: $_" "ERROR"
     }
 }
 
@@ -704,16 +898,19 @@ function Invoke-MaintenanceUtilities {
             Write-Host " [OK] Winsock catalog reset. System restart recommended." -ForegroundColor Green
         }
         "ClearTemp" {
-            Write-Host "`n[+] Clearing Temporary Files..." -ForegroundColor Cyan
-            Write-Log "Clearing Temp files..."
-            $TempFolders = @($env:TEMP, "$env:SystemRoot\Temp")
+            Write-Host "`n[+] Clearing Temporary Files & Recycle Bin..." -ForegroundColor Cyan
+            Write-Log "Clearing Temp files and Recycle Bin..."
+            $TempFolders = @($env:TEMP, "$env:SystemRoot\Temp", "$env:ALLUSERSPROFILE\Microsoft\Windows\WER")
             foreach ($folder in $TempFolders) {
                 if (Test-Path $folder) {
                     Get-ChildItem -Path $folder -Recurse -Force -ErrorAction SilentlyContinue |
                         Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
                 }
             }
-            Write-Host " [OK] Temporary files cleared." -ForegroundColor Green
+            try {
+                Clear-RecycleBin -Force -ErrorAction SilentlyContinue
+            } catch {}
+            Write-Host " [OK] Temporary files, error reports, and Recycle Bin cleared." -ForegroundColor Green
         }
         "PurgePrintQueue" {
             Write-Host "`n[+] Purging Print Queue & Restarting Spooler..." -ForegroundColor Cyan
@@ -736,6 +933,59 @@ function Invoke-MaintenanceUtilities {
             }
             Write-Host " [OK] Windows Update services (wuauserv, bits, cryptsvc) restarted." -ForegroundColor Green
         }
+        "CreateRestorePoint" {
+            Write-Host "`n[+] Creating System Restore Point..." -ForegroundColor Cyan
+            Write-Log "Creating System Restore Point..."
+            try {
+                Checkpoint-Computer -Description "SysAdmin_Toolkit_RestorePoint" -RestorePointType "MODIFY_SETTINGS" -ErrorAction Stop
+                Write-Host " [OK] System Restore Point created successfully." -ForegroundColor Green
+                Write-Log "System Restore Point created successfully."
+            } catch {
+                Write-Host " [!] Failed to create System Restore Point: $_" -ForegroundColor Red
+                Write-Log "Failed to create System Restore Point: $_" "ERROR"
+            }
+        }
+        "UpdateDefenderSignatures" {
+            Write-Host "`n[+] Updating Windows Defender Definitions..." -ForegroundColor Cyan
+            Write-Log "Updating Windows Defender Signatures..."
+            try {
+                Update-MpSignature -ErrorAction Stop
+                Write-Host " [OK] Windows Defender signatures updated successfully." -ForegroundColor Green
+                Write-Log "Windows Defender signatures updated successfully."
+            } catch {
+                Write-Host " [!] Failed to update Defender signatures: $_" -ForegroundColor Red
+                Write-Log "Failed to update Defender signatures: $_" "ERROR"
+            }
+        }
+        "ResetUpdateCache" {
+            Write-Host "`n[+] Resetting Windows Update Cache (SoftwareDistribution)..." -ForegroundColor Cyan
+            Write-Log "Resetting Windows Update Cache..."
+            try {
+                Stop-Service -Name "wuauserv" -Force -ErrorAction SilentlyContinue
+                Stop-Service -Name "bits" -Force -ErrorAction SilentlyContinue
+                Stop-Service -Name "cryptsvc" -Force -ErrorAction SilentlyContinue
+
+                $SoftDist = "$env:SystemRoot\SoftwareDistribution"
+                $CatRoot2 = "$env:SystemRoot\System32\catroot2"
+
+                if (Test-Path $SoftDist) {
+                    Rename-Item -Path $SoftDist -NewName "SoftwareDistribution.bak_$(Get-Date -Format 'yyyyMMddHHmmss')" -ErrorAction SilentlyContinue
+                }
+                if (Test-Path $CatRoot2) {
+                    Rename-Item -Path $CatRoot2 -NewName "catroot2.bak_$(Get-Date -Format 'yyyyMMddHHmmss')" -ErrorAction SilentlyContinue
+                }
+
+                Start-Service -Name "wuauserv" -ErrorAction SilentlyContinue
+                Start-Service -Name "bits" -ErrorAction SilentlyContinue
+                Start-Service -Name "cryptsvc" -ErrorAction SilentlyContinue
+
+                Write-Host " [OK] Windows Update cache reset successfully." -ForegroundColor Green
+                Write-Log "Windows Update cache reset successfully."
+            } catch {
+                Write-Host " [!] Error resetting Windows Update cache: $_" -ForegroundColor Red
+                Write-Log "Error resetting Windows Update cache: $_" "ERROR"
+            }
+        }
     }
 }
 
@@ -749,12 +999,15 @@ function Invoke-FullDiagnosticMode {
     Get-HardwareInformation
     Get-DiskHealth
     Get-InstalledSoftware
+    Get-DriverDiagnostics
     Get-NetworkDiagnostics
+    Get-NetworkExtendedInfo
     Get-EventLogs
     Get-ServicesAndProcesses
     Get-FirewallStatus
     Get-WindowsUpdateHistory
     Get-SecurityDiagnostics
+    Get-SmbDiagnostics
     Get-StartupAndAccountInfo
     Get-BatteryReport
 
@@ -835,15 +1088,18 @@ function Show-MainUI {
         Write-Host " [12] Security Diagnostics     (Windows Defender, BitLocker, TPM status)" -ForegroundColor White
         Write-Host " [13] Startup & Accounts Info  (Local Users, Admins, Startup applications)" -ForegroundColor White
         Write-Host " [14] Battery Report           (Laptop battery health HTML report)" -ForegroundColor White
+        Write-Host " [15] Driver Diagnostics       (PnP Error audit & missing driver check)" -ForegroundColor White
+        Write-Host " [16] Extended Network Check   (Public IP, Hosts file security, WAN latency)" -ForegroundColor White
+        Write-Host " [17] SMB Shares & Security    (Network shares, sessions & SMBv1 check)" -ForegroundColor White
         Write-Host "------------------------------------------------------------------------" -ForegroundColor DarkGray
-        Write-Host " [15] FULL DIAGNOSTIC MODE     (Run all diagnostic checks at once)" -ForegroundColor Yellow
-        Write-Host " [16] Quick Utilities          (Flush DNS, Release/Renew IP, Reset Winsock, Clear Temp, Print Queue, WU Services)" -ForegroundColor Green
-        Write-Host " [17] Schedule Daily Task      (Automate script via Task Scheduler)" -ForegroundColor Green
-        Write-Host " [18] Open Report Folder       (Quick access to generated reports)" -ForegroundColor Green
+        Write-Host " [18] FULL DIAGNOSTIC MODE     (Run all diagnostic checks at once)" -ForegroundColor Yellow
+        Write-Host " [19] Quick Utilities          (Flush DNS, Reset Winsock, Clear Temp, WU Cache, Defender Update, Restore Point)" -ForegroundColor Green
+        Write-Host " [20] Schedule Daily Task      (Automate script via Task Scheduler)" -ForegroundColor Green
+        Write-Host " [21] Open Report Folder       (Quick access to generated reports)" -ForegroundColor Green
         Write-Host " [0]  Exit Toolkit" -ForegroundColor Red
         Write-Host "========================================================================" -ForegroundColor Blue
 
-        $Selection = Read-Host "Select an option [0-18]"
+        $Selection = Read-Host "Select an option [0-21]"
 
         switch ($Selection) {
             "1"  { Get-SystemInformation; Pause }
@@ -860,15 +1116,21 @@ function Show-MainUI {
             "12" { Get-SecurityDiagnostics; Pause }
             "13" { Get-StartupAndAccountInfo; Pause }
             "14" { Get-BatteryReport; Pause }
-            "15" { Invoke-FullDiagnosticMode; Pause }
-            "16" {
+            "15" { Get-DriverDiagnostics; Pause }
+            "16" { Get-NetworkExtendedInfo; Pause }
+            "17" { Get-SmbDiagnostics; Pause }
+            "18" { Invoke-FullDiagnosticMode; Pause }
+            "19" {
                 Write-Host "`nSelect Utility Action:" -ForegroundColor Cyan
                 Write-Host " [A] Flush DNS Cache"
                 Write-Host " [B] Release & Renew IP Address"
                 Write-Host " [C] Reset Winsock & IP Stack"
-                Write-Host " [D] Clear Temporary Files"
+                Write-Host " [D] Clear Temporary Files & Recycle Bin"
                 Write-Host " [E] Purge Print Queue & Restart Spooler"
                 Write-Host " [F] Restart Windows Update Services"
+                Write-Host " [G] Create System Restore Point"
+                Write-Host " [H] Update Windows Defender Signatures"
+                Write-Host " [I] Reset Windows Update Cache (SoftwareDistribution)"
                 $SubChoice = Read-Host "Choice"
                 switch ($SubChoice.ToUpper()) {
                     "A" { Invoke-MaintenanceUtilities -Action "FlushDNS" }
@@ -877,11 +1139,14 @@ function Show-MainUI {
                     "D" { Invoke-MaintenanceUtilities -Action "ClearTemp" }
                     "E" { Invoke-MaintenanceUtilities -Action "PurgePrintQueue" }
                     "F" { Invoke-MaintenanceUtilities -Action "RestartUpdateServices" }
+                    "G" { Invoke-MaintenanceUtilities -Action "CreateRestorePoint" }
+                    "H" { Invoke-MaintenanceUtilities -Action "UpdateDefenderSignatures" }
+                    "I" { Invoke-MaintenanceUtilities -Action "ResetUpdateCache" }
                 }
                 Pause
             }
-            "17" { Add-ScheduledTaskHelper; Pause }
-            "18" { Open-ReportFolder; Pause }
+            "20" { Add-ScheduledTaskHelper; Pause }
+            "21" { Open-ReportFolder; Pause }
             "0"  { Write-Host "Exiting SysAdmin Toolkit. Goodbye!" -ForegroundColor Cyan; break }
             default { Write-Host "Invalid selection. Please try again." -ForegroundColor Red; Start-Sleep -Seconds 1 }
         }
