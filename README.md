@@ -4,6 +4,8 @@
 
 A comprehensive, all-in-one diagnostic, repair, and maintenance PowerShell toolkit engineered for technical support professionals, sysadmins, and IT technicians. Collects system specs, inspects hardware, evaluates disk health, analyzes event logs, diagnoses network issues, inspects security/encryption/TPM settings, audits startup items & user accounts, performs Windows repairs, and generates consolidated reports.
 
+![SysAdmin Toolkit Interactive Menu](image.png)
+
 ---
 
 ## 🛠️ Key Features
