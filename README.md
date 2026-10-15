@@ -41,14 +41,25 @@ A comprehensive, all-in-one diagnostic, repair, and maintenance PowerShell toolk
 1. **Open PowerShell as Administrator**
    Right-click PowerShell or Windows Terminal and select **Run as Administrator**.
 
-2. **Set Execution Policy (if needed):**
+2. **Unblock Downloaded File (if blocked by Windows):**
+   When scripts are downloaded from the internet, Windows marks them as blocked (untrusted). Unblock the script before running:
    ```powershell
-   Set-ExecutionPolicy RemoteSigned -Scope Process
+   Unblock-File .\SysAdmin_Toolkit.ps1
    ```
 
-3. **Run the Script:**
+3. **Set Execution Policy / Bypass Execution Restrictions:**
+   If running unsigned scripts is blocked on your system, temporarily set the execution policy for your current session:
+   ```powershell
+   Set-ExecutionPolicy Bypass -Scope Process
+   ```
+
+4. **Run the Script:**
    ```powershell
    .\SysAdmin_Toolkit.ps1
+   ```
+   *Alternatively, run directly with execution policy bypass:*
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\SysAdmin_Toolkit.ps1
    ```
 
 ---
