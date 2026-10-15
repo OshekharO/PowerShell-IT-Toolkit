@@ -1,4 +1,4 @@
-# ==============================================================================
+﻿# ==============================================================================
 # SYSADMIN TOOLKIT - FULL IT TECHNICIAN TOOLKIT
 # Tagline: Diagnose. Repair. Keep Windows Running.
 # Version: 1.0.0
@@ -73,7 +73,7 @@ function Get-SystemInformation {
         # Detailed WMI/CIM Operating System Info
         Get-CimInstance Win32_OperatingSystem | Select-Object Caption, Version, BuildNumber, OSArchitecture, LastBootUpTime, RegisteredUser, InstallDate | Format-List | Out-File -FilePath $OSInfoPath -Encoding utf8
 
-        Write-Host " [✓] System information successfully saved to $WorkDir" -ForegroundColor Green
+        Write-Host " [OK] System information successfully saved to $WorkDir" -ForegroundColor Green
         Write-Log "System Information collected successfully."
     } catch {
         Write-Host " [!] Error collecting System Information: $_" -ForegroundColor Red
@@ -136,7 +136,7 @@ function Get-HardwareInformation {
         }
 
         $HwReport | Out-File -FilePath $HwInfoPath -Encoding utf8
-        Write-Host " [✓] Hardware information saved to $HwInfoPath" -ForegroundColor Green
+        Write-Host " [OK] Hardware information saved to $HwInfoPath" -ForegroundColor Green
         Write-Log "Hardware Information collected successfully."
     } catch {
         Write-Host " [!] Error collecting Hardware Information: $_" -ForegroundColor Red
@@ -190,7 +190,7 @@ function Get-DiskHealth {
         }
 
         $DiskReport | Out-File -FilePath $DiskInfoPath -Encoding utf8
-        Write-Host " [✓] Disk health & storage report saved to $DiskInfoPath" -ForegroundColor Green
+        Write-Host " [OK] Disk health & storage report saved to $DiskInfoPath" -ForegroundColor Green
         Write-Log "Disk health & storage report saved successfully."
     } catch {
         Write-Host " [!] Error checking Disk Health: $_" -ForegroundColor Red
@@ -229,7 +229,7 @@ function Get-InstalledSoftware {
         $UniqueSoftware | Export-Csv -Path $CsvPath -NoTypeInformation -Encoding utf8
         $UniqueSoftware | Format-Table -AutoSize | Out-File -FilePath $TxtPath -Encoding utf8
 
-        Write-Host " [✓] Installed software list saved to CSV and TXT in $WorkDir" -ForegroundColor Green
+        Write-Host " [OK] Installed software list saved to CSV and TXT in $WorkDir" -ForegroundColor Green
         Write-Log "Installed Software list collected successfully ($($UniqueSoftware.Count) programs found)."
     } catch {
         Write-Host " [!] Error collecting Installed Software: $_" -ForegroundColor Red
@@ -304,7 +304,7 @@ function Get-NetworkDiagnostics {
         $NetReport += (Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Select-Object LocalAddress, LocalPort, OwningProcess | Format-Table -AutoSize | Out-String)
 
         $NetReport | Out-File -FilePath $NetPath -Encoding utf8
-        Write-Host " [✓] Network diagnostics saved to $NetPath" -ForegroundColor Green
+        Write-Host " [OK] Network diagnostics saved to $NetPath" -ForegroundColor Green
         Write-Log "Network Diagnostics completed successfully."
     } catch {
         Write-Host " [!] Error running Network Diagnostics: $_" -ForegroundColor Red
@@ -347,7 +347,7 @@ function Get-EventLogs {
         }
 
         $EventReport | Out-File -FilePath $LogPath -Encoding utf8
-        Write-Host " [✓] Event logs summary saved to $LogPath" -ForegroundColor Green
+        Write-Host " [OK] Event logs summary saved to $LogPath" -ForegroundColor Green
         Write-Log "Event Logs gathered successfully."
     } catch {
         Write-Host " [!] Error gathering Event Logs: $_" -ForegroundColor Red
@@ -384,7 +384,7 @@ function Get-ServicesAndProcesses {
         $ProcReport += (Get-Process | Where-Object { $_.CPU -ne $null } | Sort-Object CPU -Descending | Select-Object -First 15 Id, ProcessName, @{Name="CPU(s)";Expression={[math]::Round($_.CPU, 2)}}, @{Name="WorkingSet(MB)";Expression={[math]::Round($_.WorkingSet64/1MB, 2)}} | Format-Table -AutoSize | Out-String)
         $ProcReport | Out-File -FilePath $ProcPath -Encoding utf8
 
-        Write-Host " [✓] Services & Top Processes saved to $WorkDir" -ForegroundColor Green
+        Write-Host " [OK] Services & Top Processes saved to $WorkDir" -ForegroundColor Green
         Write-Log "Services & Processes collected successfully."
     } catch {
         Write-Host " [!] Error gathering Services & Processes: $_" -ForegroundColor Red
@@ -425,7 +425,7 @@ function Get-FirewallStatus {
         $FwReport += ($EnabledRules | Format-Table -AutoSize | Out-String)
 
         $FwReport | Out-File -FilePath $FwPath -Encoding utf8
-        Write-Host " [✓] Firewall status report saved to $FwPath" -ForegroundColor Green
+        Write-Host " [OK] Firewall status report saved to $FwPath" -ForegroundColor Green
         Write-Log "Firewall Status checked successfully."
     } catch {
         Write-Host " [!] Error checking Firewall Status: $_" -ForegroundColor Red
@@ -457,7 +457,7 @@ function Get-WindowsUpdateHistory {
         }
 
         $WuReport | Out-File -FilePath $WuPath -Encoding utf8
-        Write-Host " [✓] Windows update history saved to $WuPath" -ForegroundColor Green
+        Write-Host " [OK] Windows update history saved to $WuPath" -ForegroundColor Green
         Write-Log "Windows Update History collected successfully."
     } catch {
         Write-Host " [!] Error gathering Windows Update History: $_" -ForegroundColor Red
@@ -521,7 +521,7 @@ function Get-SecurityDiagnostics {
         }
 
         $SecReport | Out-File -FilePath $SecPath -Encoding utf8
-        Write-Host " [✓] Security diagnostics report saved to $SecPath" -ForegroundColor Green
+        Write-Host " [OK] Security diagnostics report saved to $SecPath" -ForegroundColor Green
         Write-Log "Security Diagnostics checked successfully."
     } catch {
         Write-Host " [!] Error checking Security Diagnostics: $_" -ForegroundColor Red
@@ -590,7 +590,7 @@ function Get-StartupAndAccountInfo {
         }
 
         $Report | Out-File -FilePath $StartAccPath -Encoding utf8
-        Write-Host " [✓] Startup apps & user account info saved to $StartAccPath" -ForegroundColor Green
+        Write-Host " [OK] Startup apps & user account info saved to $StartAccPath" -ForegroundColor Green
         Write-Log "Startup Apps & User Account Info collected successfully."
     } catch {
         Write-Host " [!] Error collecting Startup & Account Info: $_" -ForegroundColor Red
@@ -618,7 +618,7 @@ function Invoke-WindowsRepair {
         $SfcResult = sfc.exe /scannow 2>&1 | Out-String
         $SfcResult | Out-File -FilePath $RepairLog -Append -Encoding utf8
 
-        Write-Host " [✓] DISM & SFC Scans completed. Results appended to $RepairLog" -ForegroundColor Green
+        Write-Host " [OK] DISM & SFC Scans completed. Results appended to $RepairLog" -ForegroundColor Green
         Write-Log "Windows Repair routines completed successfully."
     } catch {
         Write-Host " [!] Error during Windows Repair execution: $_" -ForegroundColor Red
@@ -637,7 +637,7 @@ function Invoke-CHKDSKScan {
         $ChkdskOutput = chkdsk.exe C: 2>&1 | Out-String
         $ChkdskOutput | Out-File -FilePath $ChkdskLog -Encoding utf8
 
-        Write-Host " [✓] Read-only CHKDSK scan completed. Report saved to $ChkdskLog" -ForegroundColor Green
+        Write-Host " [OK] Read-only CHKDSK scan completed. Report saved to $ChkdskLog" -ForegroundColor Green
         Write-Log "CHKDSK scan completed successfully."
     } catch {
         Write-Host " [!] Error running CHKDSK scan: $_" -ForegroundColor Red
@@ -656,7 +656,7 @@ function Get-BatteryReport {
         powercfg.exe /batteryreport /output $BatteryHtml | Out-Null
 
         if (Test-Path $BatteryHtml) {
-            Write-Host " [✓] Battery HTML report saved to $BatteryHtml" -ForegroundColor Green
+            Write-Host " [OK] Battery HTML report saved to $BatteryHtml" -ForegroundColor Green
             Write-Log "Battery HTML report generated at $BatteryHtml."
 
             # Attempt capacity extraction via WMI if available
@@ -687,21 +687,21 @@ function Invoke-MaintenanceUtilities {
             Write-Host "`n[+] Flushing DNS Resolver Cache..." -ForegroundColor Cyan
             Write-Log "Flushing DNS Cache..."
             ipconfig /flushdns | Out-Null
-            Write-Host " [✓] DNS Cache successfully flushed." -ForegroundColor Green
+            Write-Host " [OK] DNS Cache successfully flushed." -ForegroundColor Green
         }
         "ReleaseRenewIP" {
             Write-Host "`n[+] Releasing and Renewing IP Address..." -ForegroundColor Cyan
             Write-Log "Releasing and Renewing IP Address..."
             ipconfig /release | Out-Null
             ipconfig /renew | Out-Null
-            Write-Host " [✓] IP Address lease successfully released and renewed." -ForegroundColor Green
+            Write-Host " [OK] IP Address lease successfully released and renewed." -ForegroundColor Green
         }
         "ResetWinsock" {
             Write-Host "`n[+] Resetting Winsock & IP Stack..." -ForegroundColor Cyan
             Write-Log "Resetting Winsock catalog..."
             netsh winsock reset | Out-Null
             netsh int ip reset | Out-Null
-            Write-Host " [✓] Winsock catalog reset. System restart recommended." -ForegroundColor Green
+            Write-Host " [OK] Winsock catalog reset. System restart recommended." -ForegroundColor Green
         }
         "ClearTemp" {
             Write-Host "`n[+] Clearing Temporary Files..." -ForegroundColor Cyan
@@ -713,7 +713,7 @@ function Invoke-MaintenanceUtilities {
                         Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
                 }
             }
-            Write-Host " [✓] Temporary files cleared." -ForegroundColor Green
+            Write-Host " [OK] Temporary files cleared." -ForegroundColor Green
         }
         "PurgePrintQueue" {
             Write-Host "`n[+] Purging Print Queue & Restarting Spooler..." -ForegroundColor Cyan
@@ -725,7 +725,7 @@ function Invoke-MaintenanceUtilities {
                     Remove-Item -Force -ErrorAction SilentlyContinue
             }
             Start-Service -Name "Spooler" -ErrorAction SilentlyContinue
-            Write-Host " [✓] Print queue purged and Spooler service restarted." -ForegroundColor Green
+            Write-Host " [OK] Print queue purged and Spooler service restarted." -ForegroundColor Green
         }
         "RestartUpdateServices" {
             Write-Host "`n[+] Restarting Windows Update Services..." -ForegroundColor Cyan
@@ -734,7 +734,7 @@ function Invoke-MaintenanceUtilities {
             foreach ($svc in $WuServices) {
                 Restart-Service -Name $svc -Force -ErrorAction SilentlyContinue
             }
-            Write-Host " [✓] Windows Update services (wuauserv, bits, cryptsvc) restarted." -ForegroundColor Green
+            Write-Host " [OK] Windows Update services (wuauserv, bits, cryptsvc) restarted." -ForegroundColor Green
         }
     }
 }
@@ -796,7 +796,7 @@ function Add-ScheduledTaskHelper {
         $Principal = New-ScheduledTaskPrincipal -UserId "NT AUTHORITY\SYSTEM" -LogonType ServiceAccount -RunLevel Highest
 
         Register-ScheduledTask -TaskName $TaskName -Action $Action -Trigger $Trigger -Principal $Principal -Force | Out-Null
-        Write-Host " [✓] Scheduled Task '$TaskName' created successfully to run daily at 8:00 AM." -ForegroundColor Green
+        Write-Host " [OK] Scheduled Task '$TaskName' created successfully to run daily at 8:00 AM." -ForegroundColor Green
         Write-Log "Scheduled Task '$TaskName' created successfully."
     } catch {
         Write-Host " [!] Error creating Scheduled Task: $_" -ForegroundColor Red
