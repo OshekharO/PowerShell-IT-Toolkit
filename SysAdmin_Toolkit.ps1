@@ -416,6 +416,18 @@ function Get-NetworkExtendedInfo {
                 $Report += "Domain: $t -> Resolution Failed"
             }
         }
+        $Report += ""
+
+        # Network Path Trace (Traceroute)
+        $Report += "--- NETWORK PATH TRACE (TRACERT) ---"
+        try {
+            $TraceTarget = "8.8.8.8"
+            $Report += "Tracing route to $TraceTarget..."
+            $TraceOutput = tracert.exe -d -h 15 $TraceTarget 2>&1 | Out-String
+            $Report += $TraceOutput
+        } catch {
+            $Report += "Traceroute failed: $_"
+        }
 
         $Report | Out-File -FilePath $NetExtPath -Encoding utf8
         Write-Host " [OK] Extended network info saved to $NetExtPath" -ForegroundColor Green
@@ -768,6 +780,15 @@ function Get-StartupAndAccountInfo {
         }
         $Report += ""
 
+        # Password & Lockout Policy (net accounts)
+        $Report += "--- PASSWORD & ACCOUNT LOCKOUT POLICY (NET ACCOUNTS) ---"
+        try {
+            $NetAcc = net.exe accounts 2>&1 | Out-String
+            $Report += $NetAcc
+        } catch {
+            $Report += "Unable to run net accounts."
+        }""
+
         # Startup Applications (Registry + Startup Folder)
         $Report += "--- STARTUP APPLICATIONS (REGISTRY & CIM) ---"
         try {
@@ -986,6 +1007,98 @@ function Invoke-MaintenanceUtilities {
                 Write-Log "Error resetting Windows Update cache: $_" "ERROR"
             }
         }
+        "ForceKillProcess" {
+            Write-Host "`n[+] Force Kill Process (taskkill)..." -ForegroundColor Cyan
+            Write-Log "Starting Force Kill Process..."
+            $ProcInput = Read-Host "Enter Process Name (e.g. notepad.exe) or Process ID (PID)"
+            if ([string]::IsNullOrWhiteSpace($ProcInput)) {
+                Write-Host " [!] No input provided." -ForegroundColor Yellow
+                return
+            }
+            try {
+                if ($ProcInput -match '^\d+$') {
+                    Stop-Process -Id ([int]$ProcInput) -Force -ErrorAction Stop
+                    Write-Host " [OK] Process with PID $ProcInput forcibly terminated." -ForegroundColor Green
+                    Write-Log "Process PID $ProcInput killed."
+                } else {
+                    taskkill.exe /IM $ProcInput /F 2>&1 | Out-Host
+                    Write-Host " [OK] Taskkill executed for process '$ProcInput'." -ForegroundColor Green
+                    Write-Log "Taskkill executed for '$ProcInput'."
+                }
+            } catch {
+                Write-Host " [!] Error killing process: $_" -ForegroundColor Red
+                Write-Log "Error killing process: $_" "ERROR"
+            }
+        }
+        "ManageUserAccount" {
+            Write-Host "`n[+] Local User Account Management..." -ForegroundColor Cyan
+            Write-Host " [1] Create New Local User"
+            Write-Host " [2] Delete Local User"
+            Write-Host " [3] Grant Administrator Rights to User"
+            $UserChoice = Read-Host "Select Action [1-3]"
+            switch ($UserChoice) {
+                "1" {
+                    $UName = Read-Host "Enter new username"
+                    if (-not [string]::IsNullOrWhiteSpace($UName)) {
+                        $Pass = Read-Host "Enter password for $UName" -AsSecureString
+                        try {
+                            New-LocalUser -Name $UName -Password $Pass -FullName $UName -Description "Created via SysAdmin Toolkit" -ErrorAction Stop | Out-Null
+                            Write-Host " [OK] Local user '$UName' created successfully." -ForegroundColor Green
+                            Write-Log "User '$UName' created."
+                        } catch {
+                            net.exe user $UName /add 2>&1 | Out-Host
+                        }
+                    }
+                }
+                "2" {
+                    $UName = Read-Host "Enter username to delete"
+                    if (-not [string]::IsNullOrWhiteSpace($UName)) {
+                        try {
+                            Remove-LocalUser -Name $UName -ErrorAction Stop
+                            Write-Host " [OK] Local user '$UName' deleted." -ForegroundColor Green
+                            Write-Log "User '$UName' deleted."
+                        } catch {
+                            net.exe user $UName /delete 2>&1 | Out-Host
+                        }
+                    }
+                }
+                "3" {
+                    $UName = Read-Host "Enter username to add to Administrators group"
+                    if (-not [string]::IsNullOrWhiteSpace($UName)) {
+                        try {
+                            Add-LocalGroupMember -Group "Administrators" -Member $UName -ErrorAction Stop
+                            Write-Host " [OK] User '$UName' added to local Administrators group." -ForegroundColor Green
+                            Write-Log "User '$UName' added to Administrators group."
+                        } catch {
+                            net.exe localgroup administrators $UName /add 2>&1 | Out-Host
+                        }
+                    }
+                }
+            }
+        }
+        "LaunchAdminTools" {
+            Write-Host "`n[+] Windows Admin Console & MMC Snap-ins Launcher..." -ForegroundColor Cyan
+            Write-Host " [1] Services Console (services.msc)"
+            Write-Host " [2] Network Connections (ncpa.cpl)"
+            Write-Host " [3] Programs and Features (appwiz.cpl)"
+            Write-Host " [4] Local Group Policy Editor (gpedit.msc)"
+            Write-Host " [5] Registry Editor (regedit.exe)"
+            Write-Host " [6] Computer Management (compmgmt.msc)"
+            Write-Host " [7] System Information GUI (msinfo32.exe)"
+            Write-Host " [8] Windows Version (winver.exe)"
+            $ToolChoice = Read-Host "Select Tool to launch [1-8]"
+            switch ($ToolChoice) {
+                "1" { Start-Process "services.msc" }
+                "2" { Start-Process "ncpa.cpl" }
+                "3" { Start-Process "appwiz.cpl" }
+                "4" { Start-Process "gpedit.msc" }
+                "5" { Start-Process "regedit.exe" }
+                "6" { Start-Process "compmgmt.msc" }
+                "7" { Start-Process "msinfo32.exe" }
+                "8" { Start-Process "winver.exe" }
+                default { Write-Host " [!] Invalid selection." -ForegroundColor Yellow }
+            }
+        }
     }
 }
 
@@ -1093,7 +1206,7 @@ function Show-MainUI {
         Write-Host " [17] SMB Shares & Security    (Network shares, sessions & SMBv1 check)" -ForegroundColor White
         Write-Host "------------------------------------------------------------------------" -ForegroundColor DarkGray
         Write-Host " [18] FULL DIAGNOSTIC MODE     (Run all diagnostic checks at once)" -ForegroundColor Yellow
-        Write-Host " [19] Quick Utilities          (Flush DNS, Reset Winsock, Clear Temp, WU Cache, Defender Update, Restore Point)" -ForegroundColor Green
+        Write-Host " [19] Quick Utilities          (Flush DNS, Reset Winsock, Clear Temp, Kill Process, User Mgmt, Admin Snap-ins)" -ForegroundColor Green
         Write-Host " [20] Schedule Daily Task      (Automate script via Task Scheduler)" -ForegroundColor Green
         Write-Host " [21] Open Report Folder       (Quick access to generated reports)" -ForegroundColor Green
         Write-Host " [0]  Exit Toolkit" -ForegroundColor Red
@@ -1131,6 +1244,9 @@ function Show-MainUI {
                 Write-Host " [G] Create System Restore Point"
                 Write-Host " [H] Update Windows Defender Signatures"
                 Write-Host " [I] Reset Windows Update Cache (SoftwareDistribution)"
+                Write-Host " [J] Force Kill Process (taskkill)"
+                Write-Host " [K] Local User Account Management (net user / add / delete / admin)"
+                Write-Host " [L] Launch Admin Console / MMC Snap-in (services.msc, ncpa.cpl, etc.)"
                 $SubChoice = Read-Host "Choice"
                 switch ($SubChoice.ToUpper()) {
                     "A" { Invoke-MaintenanceUtilities -Action "FlushDNS" }
@@ -1142,6 +1258,9 @@ function Show-MainUI {
                     "G" { Invoke-MaintenanceUtilities -Action "CreateRestorePoint" }
                     "H" { Invoke-MaintenanceUtilities -Action "UpdateDefenderSignatures" }
                     "I" { Invoke-MaintenanceUtilities -Action "ResetUpdateCache" }
+                    "J" { Invoke-MaintenanceUtilities -Action "ForceKillProcess" }
+                    "K" { Invoke-MaintenanceUtilities -Action "ManageUserAccount" }
+                    "L" { Invoke-MaintenanceUtilities -Action "LaunchAdminTools" }
                 }
                 Pause
             }
