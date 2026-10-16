@@ -15,7 +15,7 @@ A comprehensive, all-in-one diagnostic, repair, and maintenance IT toolkit engin
 - **Disk Health & Storage:** Logical volume space usage and physical disk SMART health status (`smartctl` on Linux).
 - **Device Driver & Kernel Diagnostics:** Audits Plug and Play hardware devices / kernel `dmesg` logs for driver errors, missing drivers, and hardware issues.
 - **Network Diagnostics:** IP configuration, active network adapters, ICMP ping tests, DNS server checks, routing table, ARP cache, and listening ports.
-- **Extended Network Check:** Public IP address lookup, WAN domain resolution & latency checks, and Hosts file (`/etc/hosts` or `C:\Windows\System32\drivers\etc\hosts`) security audit for unauthorized redirects.
+- **Extended Network Check:** Public IP address lookup, WAN domain resolution & latency checks, network path tracing (`tracert` / `traceroute`), and Hosts file (`/etc/hosts` or `C:\Windows\System32\drivers\etc\hosts`) security audit for unauthorized redirects.
 - **SMB Shares & Security:** Audits active network shares, active SMB sessions, and checks for insecure SMBv1/legacy protocol configurations.
 - **Event Logs & Journald:** Queries recent Critical and Error entries across system logs (`journalctl` / `syslog` / `auth.log` on Linux; System, Application, and Security logs on Windows).
 - **Services & Processes:** Identifies stopped/failed automatic services and highlights top CPU and Memory consuming processes.
@@ -25,10 +25,10 @@ A comprehensive, all-in-one diagnostic, repair, and maintenance IT toolkit engin
 - **Firewall Status:** Status of Firewall profiles (`UFW`, `Firewalld`, `iptables` on Linux; Domain/Private/Public on Windows) along with active rule summaries.
 - **Update History:** Displays installed hotfixes and package update transaction records sorted by date.
 - **Security Diagnostics:** Inspects Defender/ClamAV status, BitLocker/LUKS volume encryption, SELinux/AppArmor, and TPM health.
-- **Startup & Accounts Info:** Audits startup applications, local user accounts, sudo/administrator group members, and desktop autostart items.
+- **Startup & Accounts Info:** Audits startup applications, local user accounts, password & account lockout policy settings (`net accounts` / `chage`), sudo/administrator group members, and desktop autostart items.
 - **Battery Report:** Generates an HTML battery health and capacity report.
 - **Full Diagnostic Mode:** Runs all diagnostic functions sequentially and creates a timestamped report directory.
-- **Quick Maintenance Utilities:** Quick actions to Flush DNS (`resolvectl`), Release & Renew IP (`dhclient`/`nmcli`), Reset Network Stack, Clear Temporary Files, Purge Print Queue (`CUPS`), Restart Update Services, Create System Snapshot (`Timeshift`/`Snapper`), Update Antivirus Signatures (`ClamAV`), and Reset Package Manager Cache (`apt clean`/`dnf clean`).
+- **Quick Maintenance Utilities:** Quick actions to Flush DNS (`resolvectl`), Release & Renew IP (`dhclient`/`nmcli`), Reset Network Stack, Clear Temporary Files, Purge Print Queue (`CUPS`), Restart Update Services, Create System Snapshot (`Timeshift`/`Snapper`), Update Antivirus Signatures (`ClamAV`), Reset Package Manager Cache (`apt clean`/`dnf clean`), Force Kill Process (`taskkill` / `kill -9`), Local User Account Management (`net user` / `useradd`), and Administrative MMC Snap-ins & Diagnostic Tools Launcher (`services.msc`, `ncpa.cpl`, `appwiz.cpl`, `gpedit.msc`, `regedit`, `compmgmt.msc`, `msinfo32`, `winver`, `htop`, `nmtui`, `journalctl`).
 - **Open Report Folder:** Fast 1-click access to all generated reports (`xdg-open` on Linux).
 - **Automated Task Integration:** Automated daily diagnostic task setup via Task Scheduler (Windows) or Cron (Linux).
 

@@ -453,6 +453,17 @@ get_network_extended_info() {
                 ping -c 1 -W 3 "$domain" 2>/dev/null | head -2
             fi
         done
+        echo ""
+
+        echo "--- NETWORK PATH TRACE (TRACEROUTE) ---"
+        local trace_target="8.8.8.8"
+        if has_cmd traceroute; then
+            traceroute -m 15 -n "$trace_target" 2>&1
+        elif has_cmd tracepath; then
+            tracepath -m 15 -n "$trace_target" 2>&1
+        else
+            echo "Neither traceroute nor tracepath installed."
+        fi
     } > "$net_ext_path"
 
     echo " [OK] Extended network info saved to $net_ext_path"
@@ -751,6 +762,21 @@ get_startup_and_account_info() {
         getent group wheel 2>/dev/null || true
         echo ""
 
+        echo "--- PASSWORD AGING & ACCOUNT POLICY (CHAGE / PASSWD) ---"
+        if [ "$IS_ROOT" -eq 1 ] && [ -f /etc/shadow ]; then
+            awk -F: '$2 !~ /^\*/ && $2 !~ /^!/ {print $1}' /etc/shadow | while read -r usr; do
+                if has_cmd chage; then
+                    echo "User Policy: $usr"
+                    chage -l "$usr" 2>/dev/null | grep -E 'Password expires|Maximum number of days|Account expires'
+                fi
+            done
+        elif [ -f /etc/login.defs ]; then
+            grep -E '^PASS_MAX_DAYS|^PASS_MIN_DAYS|^PASS_WARN_AGE' /etc/login.defs 2>/dev/null || true
+        else
+            echo "Password policy information unavailable."
+        fi
+        echo ""
+
         echo "--- ENABLED SYSTEMD SERVICES AT BOOT ---"
         if has_cmd systemctl; then
             systemctl list-unit-files --type=service --state=enabled --no-pager | head -30
@@ -1028,6 +1054,100 @@ invoke_maintenance_utilities() {
                 echo " [!] Root privileges required to clear package cache."
             fi
             ;;
+        "ForceKillProcess")
+            echo -e "\n[+] Force Kill Process (kill -9 / pkill)..."
+            write_log "Starting Force Kill Process..."
+            read -rp "Enter Process Name or Process ID (PID) to kill: " proc_input
+            if [ -z "$proc_input" ]; then
+                echo " [!] No input provided."
+            else
+                if [[ "$proc_input" =~ ^[0-9]+$ ]]; then
+                    kill -9 "$proc_input" 2>&1
+                    echo " [OK] Signal SIGKILL (-9) sent to PID $proc_input."
+                    write_log "Process PID $proc_input killed."
+                else
+                    pkill -9 -f "$proc_input" 2>&1
+                    echo " [OK] pkill -9 executed for pattern '$proc_input'."
+                    write_log "pkill -9 executed for '$proc_input'."
+                fi
+            fi
+            ;;
+        "ManageUserAccount")
+            echo -e "\n[+] Local User Account Management..."
+            echo " [1] Create New Local User"
+            echo " [2] Delete Local User"
+            echo " [3] Grant Sudo/Admin Rights to User"
+            read -rp "Select Action [1-3]: " user_choice
+            case "$user_choice" in
+                1)
+                    read -rp "Enter new username: " uname
+                    if [ -n "$uname" ]; then
+                        if [ "$IS_ROOT" -eq 1 ]; then
+                            useradd -m "$uname" 2>&1
+                            echo "Set password for $uname:"
+                            passwd "$uname"
+                            write_log "User '$uname' created."
+                        else
+                            echo " [!] Root privileges required to create users."
+                        fi
+                    fi
+                    ;;
+                2)
+                    read -rp "Enter username to delete: " uname
+                    if [ -n "$uname" ]; then
+                        if [ "$IS_ROOT" -eq 1 ]; then
+                            userdel -r "$uname" 2>&1
+                            echo " [OK] Local user '$uname' deleted."
+                            write_log "User '$uname' deleted."
+                        else
+                            echo " [!] Root privileges required to delete users."
+                        fi
+                    fi
+                    ;;
+                3)
+                    read -rp "Enter username to add to sudo/wheel group: " uname
+                    if [ -n "$uname" ]; then
+                        if [ "$IS_ROOT" -eq 1 ]; then
+                            if getent group sudo >/dev/null 2>&1; then
+                                usermod -aG sudo "$uname" 2>&1
+                                echo " [OK] User '$uname' added to 'sudo' group."
+                            elif getent group wheel >/dev/null 2>&1; then
+                                usermod -aG wheel "$uname" 2>&1
+                                echo " [OK] User '$uname' added to 'wheel' group."
+                            fi
+                            write_log "User '$uname' added to admin group."
+                        else
+                            echo " [!] Root privileges required."
+                        fi
+                    fi
+                    ;;
+            esac
+            ;;
+        "LaunchAdminTools")
+            echo -e "\n[+] Linux Administration & Diagnostic Tools Launcher..."
+            echo " [1] System Monitor / Process Viewer (htop / top)"
+            echo " [2] Network Configuration TUI (nmtui)"
+            echo " [3] Systemd Journal Logs Monitor (journalctl -f)"
+            echo " [4] Disk Usage Analyzer (ncdu / df -h)"
+            echo " [5] Interactive Firewall Configuration (ufw status / firewall-cmd)"
+            read -rp "Select Tool to launch [1-5]: " tool_choice
+            case "$tool_choice" in
+                1) if has_cmd htop; then htop; else top; fi ;;
+                2) if has_cmd nmtui; then nmtui; else ip addr; fi ;;
+                3) journalctl -f --no-pager -n 50 ;;
+                4) if has_cmd ncdu; then ncdu; else df -h; read -rp "Press enter..."; fi ;;
+                5)
+                    if has_cmd ufw && [ "$IS_ROOT" -eq 1 ]; then
+                        ufw status verbose
+                    elif has_cmd firewall-cmd; then
+                        firewall-cmd --list-all
+                    else
+                        iptables -L -n -v | head -30
+                    fi
+                    read -rp "Press enter..."
+                    ;;
+            esac
+            ;;
     esac
 }
 
@@ -1130,7 +1250,7 @@ show_main_ui() {
         echo " [17] SMB & NFS Shares         (Network shares, sessions & Samba security)"
         echo "------------------------------------------------------------------------"
         echo " [18] FULL DIAGNOSTIC MODE     (Run all diagnostic checks at once)"
-        echo " [19] Quick Utilities          (Flush DNS, Reset Stack, Clear Temp, Package Cache)"
+        echo " [19] Quick Utilities          (Flush DNS, Reset Stack, Clear Temp, Kill Process, User Mgmt, Admin Tools)"
         echo " [20] Schedule Daily Task      (Automate script via Cron daily task)"
         echo " [21] Open Report Folder       (Quick access to generated reports)"
         echo " [0]  Exit Toolkit"
@@ -1168,6 +1288,9 @@ show_main_ui() {
                 echo " [G] Create System Snapshot (Timeshift / Snapper)"
                 echo " [H] Update Antivirus Signatures (ClamAV)"
                 echo " [I] Reset Package Manager Cache"
+                echo " [J] Force Kill Process (kill -9 / pkill)"
+                echo " [K] Local User Account Management (useradd / userdel / usermod)"
+                echo " [L] Launch Admin Console / Diagnostic Tools (htop, nmtui, journalctl)"
                 read -rp "Choice: " subchoice
                 case "${subchoice^^}" in
                     A) invoke_maintenance_utilities "FlushDNS" ;;
@@ -1179,6 +1302,9 @@ show_main_ui() {
                     G) invoke_maintenance_utilities "CreateSnapshot" ;;
                     H) invoke_maintenance_utilities "UpdateAVSignatures" ;;
                     I) invoke_maintenance_utilities "ResetPackageCache" ;;
+                    J) invoke_maintenance_utilities "ForceKillProcess" ;;
+                    K) invoke_maintenance_utilities "ManageUserAccount" ;;
+                    L) invoke_maintenance_utilities "LaunchAdminTools" ;;
                 esac
                 pause_prompt
                 ;;
