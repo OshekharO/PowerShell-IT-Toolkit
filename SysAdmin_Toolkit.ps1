@@ -1099,6 +1099,16 @@ function Invoke-MaintenanceUtilities {
                 default { Write-Host " [!] Invalid selection." -ForegroundColor Yellow }
             }
         }
+        "ActivateWindowsOffice" {
+            Write-Host "`n[+] Launching Windows / Office Activator..." -ForegroundColor Cyan
+            Write-Log "Launching Windows / Office Activator (get.activated.win)..."
+            try {
+                irm https://get.activated.win | iex
+            } catch {
+                Write-Host " [!] Error launching Windows / Office Activator: $_" -ForegroundColor Red
+                Write-Log "Error launching Windows / Office Activator: $_" "ERROR"
+            }
+        }
     }
 }
 
@@ -1247,6 +1257,7 @@ function Show-MainUI {
                 Write-Host " [J] Force Kill Process (taskkill)"
                 Write-Host " [K] Local User Account Management (net user / add / delete / admin)"
                 Write-Host " [L] Launch Admin Console / MMC Snap-in (services.msc, ncpa.cpl, etc.)"
+                Write-Host " [M] Windows / Office Activator (irm https://get.activated.win | iex)"
                 $SubChoice = Read-Host "Choice"
                 switch ($SubChoice.ToUpper()) {
                     "A" { Invoke-MaintenanceUtilities -Action "FlushDNS" }
@@ -1261,6 +1272,7 @@ function Show-MainUI {
                     "J" { Invoke-MaintenanceUtilities -Action "ForceKillProcess" }
                     "K" { Invoke-MaintenanceUtilities -Action "ManageUserAccount" }
                     "L" { Invoke-MaintenanceUtilities -Action "LaunchAdminTools" }
+                    "M" { Invoke-MaintenanceUtilities -Action "ActivateWindowsOffice" }
                 }
                 Pause
             }
