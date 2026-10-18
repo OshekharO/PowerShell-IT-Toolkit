@@ -1257,7 +1257,7 @@ function Show-MainUI {
                 Write-Host " [J] Force Kill Process (taskkill)"
                 Write-Host " [K] Local User Account Management (net user / add / delete / admin)"
                 Write-Host " [L] Launch Admin Console / MMC Snap-in (services.msc, ncpa.cpl, etc.)"
-                Write-Host " [M] Windows / Office Activator (irm https://get.activated.win | iex)"
+                Write-Host " [M] Windows / Office Activator"
                 $SubChoice = Read-Host "Choice"
                 switch ($SubChoice.ToUpper()) {
                     "A" { Invoke-MaintenanceUtilities -Action "FlushDNS" }
