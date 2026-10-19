@@ -1086,7 +1086,9 @@ function Invoke-MaintenanceUtilities {
             Write-Host " [6] Computer Management (compmgmt.msc)"
             Write-Host " [7] System Information GUI (msinfo32.exe)"
             Write-Host " [8] Windows Version (winver.exe)"
-            $ToolChoice = Read-Host "Select Tool to launch [1-8]"
+            Write-Host " [9] System Restore Wizard (rstrui.exe)"
+            Write-Host " [10] Reset Windows PC (systemreset.exe)"
+            $ToolChoice = Read-Host "Select Tool to launch [1-10]"
             switch ($ToolChoice) {
                 "1" { Start-Process "services.msc" }
                 "2" { Start-Process "ncpa.cpl" }
@@ -1096,6 +1098,8 @@ function Invoke-MaintenanceUtilities {
                 "6" { Start-Process "compmgmt.msc" }
                 "7" { Start-Process "msinfo32.exe" }
                 "8" { Start-Process "winver.exe" }
+                "9"  { Start-Process "rstrui.exe" }
+                "10" { Start-Process "systemreset.exe" }
                 default { Write-Host " [!] Invalid selection." -ForegroundColor Yellow }
             }
         }
