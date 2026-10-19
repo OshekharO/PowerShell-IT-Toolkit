@@ -2,7 +2,7 @@
 
 > **Tagline:** Diagnose. Repair. Keep Systems Running.
 
-A comprehensive, all-in-one diagnostic, repair, and maintenance IT toolkit engineered for technical support professionals, sysadmins, and IT technicians across **Windows** and **Linux** environments. Collects system specs, inspects hardware, evaluates disk health, audits device drivers, inspects SMB network shares, analyzes event logs, diagnoses local and extended network issues, inspects security/encryption/TPM settings, audits startup items & user accounts, performs system & package repairs, and generates consolidated reports.
+A comprehensive, all-in-one diagnostic, repair, and maintenance IT toolkit engineered for technical support professionals, sysadmins, and IT technicians across **Windows** and **Linux** environments. Collects system specs, inspects hardware, evaluates disk health, audits device drivers, inspects SMB network shares, analyzes BSOD crash dumps & event logs, diagnoses local and extended network issues, inspects security/licensing/encryption/TPM settings, repairs WMI databases, recovers Wi-Fi & Bluetooth adapters, audits startup items & user accounts, performs system & package repairs, and generates consolidated reports.
 
 ![SysAdmin Toolkit Interactive Menu](image.png)
 
@@ -17,6 +17,7 @@ A comprehensive, all-in-one diagnostic, repair, and maintenance IT toolkit engin
 - **Network Diagnostics:** IP configuration, active network adapters, ICMP ping tests, DNS server checks, routing table, ARP cache, and listening ports.
 - **Extended Network Check:** Public IP address lookup, WAN domain resolution & latency checks, network path tracing (`tracert` / `traceroute`), and Hosts file (`/etc/hosts` or `C:\Windows\System32\drivers\etc\hosts`) security audit for unauthorized redirects.
 - **SMB Shares & Security:** Audits active network shares, active SMB sessions, and checks for insecure SMBv1/legacy protocol configurations.
+- **BSOD Crash Dump & BugCheck Analyzer:** Audits Windows minidump crash files (`C:\Windows\Minidump\*.dmp`), full memory dumps, and parses Event ID 1001 / 6008 BugCheck logs (or `/var/crash` and `coredumpctl` on Linux).
 - **Event Logs & Journald:** Queries recent Critical and Error entries across system logs (`journalctl` / `syslog` / `auth.log` on Linux; System, Application, and Security logs on Windows).
 - **Services & Processes:** Identifies stopped/failed automatic services and highlights top CPU and Memory consuming processes.
 - **Installed Software:** Generates a full inventory of installed software across package managers (`dpkg`, `rpm`, `pacman`, `snap`, `flatpak`, Windows Registry) and exports to CSV and TXT formats.
@@ -24,11 +25,11 @@ A comprehensive, all-in-one diagnostic, repair, and maintenance IT toolkit engin
 - **Filesystem / CHKDSK Scan:** Read-only health check for disk and volume integrity (`e2fsck` read-only check on Linux).
 - **Firewall Status:** Status of Firewall profiles (`UFW`, `Firewalld`, `iptables` on Linux; Domain/Private/Public on Windows) along with active rule summaries.
 - **Update History:** Displays installed hotfixes and package update transaction records sorted by date.
-- **Security Diagnostics:** Inspects Defender/ClamAV status, BitLocker/LUKS volume encryption, SELinux/AppArmor, and TPM health.
+- **Security & Licensing Diagnostics:** Inspects OS licensing health, Defender/ClamAV status, BitLocker/LUKS volume encryption, SELinux/AppArmor, and TPM health.
 - **Startup & Accounts Info:** Audits startup applications, local user accounts, password & account lockout policy settings (`net accounts` / `chage`), sudo/administrator group members, and desktop autostart items.
 - **Battery Report:** Generates an HTML battery health and capacity report.
 - **Full Diagnostic Mode:** Runs all diagnostic functions sequentially and creates a timestamped report directory.
-- **Quick Maintenance Utilities:** Quick actions to Flush DNS (`resolvectl`), Release & Renew IP (`dhclient`/`nmcli`), Reset Network Stack, Clear Temporary Files, Purge Print Queue (`CUPS`), Restart Update Services, Create System Snapshot (`Timeshift`/`Snapper`), Update Antivirus Signatures (`ClamAV`), Reset Package Manager Cache (`apt clean`/`dnf clean`), Force Kill Process (`taskkill` / `kill -9`), Local User Account Management (`net user` / `useradd`), Administrative MMC Snap-ins & Diagnostic Tools Launcher (`services.msc`, `ncpa.cpl`, `appwiz.cpl`, `gpedit.msc`, `regedit`, `compmgmt.msc`, `msinfo32`, `winver`, `rstrui`, `systemreset`, `htop`, `nmtui`, `journalctl`), and Windows / Office Activator (`irm https://get.activated.win | iex`).
+- **Quick Maintenance Utilities:** Quick actions to Flush DNS, Release & Renew IP, Reset Network Stack, Clear Temporary Files, Purge Print Queue (`CUPS`), Restart Update Services, Create System Snapshot (`Timeshift`/`Snapper`), Update Antivirus Signatures, Reset Package Manager Cache, Force Kill Process, Local User Account Management, Administrative MMC Snap-ins & Diagnostic Tools Launcher, Windows / Office Activator, **WMI Repository Repair & Core Service Recovery**, **Wi-Fi & Bluetooth Adapter Recovery**, and **Windows Script Host (WSH) & System PATH Environment Fixer**.
 - **Open Report Folder:** Fast 1-click access to all generated reports (`xdg-open` on Linux).
 - **Automated Task Integration:** Automated daily diagnostic task setup via Task Scheduler (Windows) or Cron (Linux).
 
@@ -62,35 +63,27 @@ A comprehensive, all-in-one diagnostic, repair, and maintenance IT toolkit engin
 
 ---
 
-### 🪟 Windows Version (`SysAdmin_Toolkit.ps1`)
+### 🪟 Windows Version (`SysAdmin_Toolkit.ps1` / `Run-SysAdmin.bat` / `SysAdmin.cmd`)
 
 #### Prerequisites
 - **Operating System:** Windows 10, Windows 11, or Windows Server 2016+
 - **PowerShell Version:** Windows PowerShell 5.1 or PowerShell 7+
-- **Privileges:** Administrator privileges required for full functionality (DISM, SFC, Event Logs, Firewall, BitLocker, Defender, TPM, System Restore).
+- **Privileges:** Administrator privileges required for full functionality (DISM, SFC, Event Logs, WMI, Firewall, BitLocker, Defender, TPM, System Restore).
 
-#### Usage Instructions
+#### Launch Methods
 
-1. **Open PowerShell as Administrator**
-   Right-click PowerShell or Windows Terminal and select **Run as Administrator**.
+##### Option A: Double-Click Launcher (Recommended)
+Double-click **`Run-SysAdmin.bat`** or **`SysAdmin.cmd`**. The launcher automatically requests Administrator elevation and executes `SysAdmin_Toolkit.ps1` with execution policy bypass.
 
-2. **Unblock Downloaded File (if blocked by Windows):**
+##### Option B: Direct PowerShell Execution
+1. Open PowerShell or Windows Terminal as **Administrator**.
+2. Unblock script if necessary:
    ```powershell
    Unblock-File .\SysAdmin_Toolkit.ps1
    ```
-
-3. **Set Execution Policy / Bypass Execution Restrictions:**
+3. Run with execution policy bypass:
    ```powershell
-   Set-ExecutionPolicy Bypass -Scope Process
-   ```
-
-4. **Run the Script:**
-   ```powershell
-   .\SysAdmin_Toolkit.ps1
-   ```
-   *Alternatively, run directly with execution policy bypass:*
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File .\SysAdmin_Toolkit.ps1
+   powershell.exe -ExecutionPolicy Bypass -File .\SysAdmin_Toolkit.ps1
    ```
 
 ---
@@ -109,14 +102,15 @@ It contains:
 - `InstalledSoftware.csv` & `InstalledSoftware.txt` - Full inventory of installed software packages.
 - `NetworkDiagnostics.txt` - Adapter details, ping results, DNS, routes, and listening ports.
 - `NetworkExtended.txt` - External Public IP, WAN DNS resolution, and Hosts file security audit.
+- `BSODCrashDiagnostics.txt` - Minidump crash files summary and Event ID 1001 BugCheck logs.
 - `SmbDiagnostics.txt` - SMB/NFS shares, active sessions, and protocol security status.
 - `EventLogs_RecentErrors.txt` - Critical/Error logs from journalctl/syslog or Windows Event Viewer.
 - `Services.txt` & `TopProcesses.txt` - Service states and top resource-consuming processes.
 - `FirewallStatus.txt` - Active firewall profiles and rule summaries.
 - `PackageUpdateHistory.txt` / `WindowsUpdateHistory.txt` - Installed updates and transaction history.
-- `SecurityDiagnostics.txt` - Antivirus, drive encryption (BitLocker/LUKS), SELinux/AppArmor, and TPM status.
+- `SecurityDiagnostics.txt` - Windows licensing status, Antivirus, drive encryption (BitLocker/LUKS), SELinux/AppArmor, and TPM status.
 - `StartupAndAccountInfo.txt` - Local accounts, sudo/admin members, and startup applications.
-- `SystemRepair.txt` / `WindowsRepair.txt` - Logs from DISM, SFC, or package manager repairs.
+- `SystemRepair.txt` / `WindowsRepair.txt` - Logs from DISM, SFC, WMI, or package manager repairs.
 - `BatteryReport.html` & `BatteryReport.txt` - Comprehensive laptop battery analytics.
 
 ---
