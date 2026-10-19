@@ -438,6 +438,76 @@ function Get-NetworkExtendedInfo {
     }
 }
 
+
+function Get-BSODCrashDiagnostics {
+    Write-Host "`n[+] Checking BSOD Crash Dumps & BugCheck History..." -ForegroundColor Cyan
+    Write-Log "Starting BSOD Crash Dump analysis..."
+
+    $BsodPath = Join-Path $WorkDir "BSODCrashDiagnostics.txt"
+
+    try {
+        $Report = @()
+        $Report += "=========================================="
+        $Report += "    BSOD CRASH DUMPS & BUGCHECK ANALYSIS  "
+        $Report += "=========================================="
+        $Report += ""
+
+        # Minidump files check
+        $MinidumpDir = "$env:SystemRoot\Minidump"
+        $Report += "--- MINIDUMP FILES ($MinidumpDir) ---"
+        if (Test-Path $MinidumpDir) {
+            $Dumps = Get-ChildItem -Path $MinidumpDir -Filter "*.dmp" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending
+            if ($Dumps) {
+                $Report += "Found $($Dumps.Count) minidump file(s):"
+                foreach ($d in $Dumps) {
+                    $SizeKB = [math]::Round($d.Length / 1KB, 2)
+                    $Report += "  $($d.Name) | Created: $($d.LastWriteTime) | Size: $SizeKB KB"
+                }
+            } else {
+                $Report += " [OK] No .dmp crash files found in $MinidumpDir."
+            }
+        } else {
+            $Report += " [OK] Minidump directory does not exist ($MinidumpDir)."
+        }
+        $Report += ""
+
+        # Memory.dmp full dump check
+        $MemoryDmp = "$env:SystemRoot\MEMORY.DMP"
+        if (Test-Path $MemoryDmp) {
+            $DmpItem = Get-Item $MemoryDmp
+            $SizeMB = [math]::Round($DmpItem.Length / 1MB, 2)
+            $Report += "Full Memory Dump Present: $MemoryDmp (Size: $SizeMB MB, Last Modified: $($DmpItem.LastWriteTime))"
+        } else {
+            $Report += "No full MEMORY.DMP file present."
+        }
+        $Report += ""
+
+        # Event ID 1001 / BugCheck Event Log Search
+        $Report += "--- RECENT BUGCHECK SYSTEM EVENTS (EVENT ID 1001 / 6008) ---"
+        try {
+            $BugChecks = Get-WinEvent -FilterHashtable @{LogName='System'; Id=1001,6008} -MaxEvents 10 -ErrorAction SilentlyContinue
+            if ($BugChecks) {
+                foreach ($bc in $BugChecks) {
+                    $Report += "[$($bc.TimeCreated.ToString('yyyy-MM-dd HH:mm:ss'))] [Event ID: $($bc.Id)] [Source: $($bc.ProviderName)]"
+                    $Report += "  Message: $($bc.Message -replace "`r`n", " ")"
+                    $Report += ""
+                }
+            } else {
+                $Report += " [OK] No recent BugCheck or unexpected shutdown events detected in System Event log."
+            }
+        } catch {
+            $Report += "Unable to query System Event log for BugCheck events."
+        }
+
+        $Report | Out-File -FilePath $BsodPath -Encoding utf8
+        Write-Host " [OK] BSOD Crash Diagnostics report saved to $BsodPath" -ForegroundColor Green
+        Write-Log "BSOD Crash Diagnostics completed successfully."
+    } catch {
+        Write-Host " [!] Error checking BSOD Crash Dumps: $_" -ForegroundColor Red
+        Write-Log "Error checking BSOD Crash Dumps: $_" "ERROR"
+    }
+}
+
 function Get-EventLogs {
     Write-Host "`n[+] Gathering Recent Windows Event Logs..." -ForegroundColor Cyan
     Write-Log "Starting Event Logs gathering..."
@@ -604,6 +674,24 @@ function Get-SecurityDiagnostics {
         $SecReport += "=========================================="
         $SecReport += ""
 
+        # Windows & Office Licensing Health Check
+        $SecReport += "--- WINDOWS & OFFICE LICENSING HEALTH ---"
+        try {
+            $License = Get-CimInstance Win32_OperatingSystem | Select-Object Caption, LicenseStatus
+            $StatusText = switch ($License.LicenseStatus) {
+                1 { "Licensed" }
+                2 { "OOB Grace" }
+                3 { "OOT Grace" }
+                4 { "Non-Genuine Grace" }
+                5 { "Notification" }
+                6 { "Extended Grace" }
+                default { "Unlicensed / Unknown ($($License.LicenseStatus))" }
+            }
+            $SecReport += "OS License Status: $StatusText"
+        } catch {
+            $SecReport += "Unable to query Windows licensing status."
+        }
+        $SecReport += ""
         # Windows Defender Status
         $SecReport += "--- WINDOWS DEFENDER STATUS ---"
         try {
@@ -898,6 +986,68 @@ function Invoke-MaintenanceUtilities {
     param([string]$Action)
 
     switch ($Action) {
+        "RepairWMI" {
+            Write-Host "`n[+] Repairing WMI Repository & Core Windows Services..." -ForegroundColor Cyan
+            Write-Log "Starting WMI Repository & Service repair..."
+            try {
+                Write-Host " Verifying WMI repository consistency..." -ForegroundColor Yellow
+                winmgmt.exe /verifyrepository 2>&1 | Out-Host
+                Write-Host " Salvaging WMI repository..." -ForegroundColor Yellow
+                winmgmt.exe /salvagerepository 2>&1 | Out-Host
+                $WmiServices = @("winmgmt", "sppsvc", "bits", "wuauserv")
+                foreach ($svc in $WmiServices) {
+                    Restart-Service -Name $svc -Force -ErrorAction SilentlyContinue
+                }
+                Write-Host " [OK] WMI repository salvaged and services restarted." -ForegroundColor Green
+                Write-Log "WMI repository repair completed."
+            } catch {
+                Write-Host " [!] Error repairing WMI: $_" -ForegroundColor Red
+                Write-Log "Error repairing WMI: $_" "ERROR"
+            }
+        }
+        "FixWiFiBluetooth" {
+            Write-Host "`n[+] Recovering Wi-Fi & Bluetooth Adapters/Services..." -ForegroundColor Cyan
+            Write-Log "Starting Wi-Fi & Bluetooth recovery..."
+            try {
+                $NetServices = @("bthserv", "wlanSvc")
+                foreach ($svc in $NetServices) {
+                    Restart-Service -Name $svc -Force -ErrorAction SilentlyContinue
+                }
+                pnputil.exe /scan-devices | Out-Null
+                Write-Host " [OK] Wi-Fi (wlanSvc) & Bluetooth (bthserv) services restarted, PnP bus rescanned." -ForegroundColor Green
+                Write-Log "Wi-Fi & Bluetooth services recovered."
+            } catch {
+                Write-Host " [!] Error recovering Wi-Fi/Bluetooth: $_" -ForegroundColor Red
+                Write-Log "Error recovering Wi-Fi/Bluetooth: $_" "ERROR"
+            }
+        }
+        "FixWSHAndPath" {
+            Write-Host "`n[+] Fixing Windows Script Host (WSH) & System PATH Environment..." -ForegroundColor Cyan
+            Write-Log "Fixing WSH & System PATH environment..."
+            try {
+                # Enable Windows Script Host in Registry if disabled
+                $WshPath = "HKLM:\SOFTWARE\Microsoft\Windows Script Host\Settings"
+                if (-not (Test-Path $WshPath)) {
+                    New-Item -Path $WshPath -Force | Out-Null
+                }
+                Set-ItemProperty -Path $WshPath -Name "Enabled" -Value 1 -Type DWord -ErrorAction SilentlyContinue
+                Write-Host " [OK] Windows Script Host re-enabled in Registry." -ForegroundColor Green
+
+                # Verify System %PATH%
+                $SysPath = [Environment]::GetEnvironmentVariable("Path", "Machine")
+                if ($SysPath -notmatch "System32") {
+                    $SysPath += ";C:\Windows\System32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\"
+                    [Environment]::GetEnvironmentVariable("Path", $SysPath, "Machine") | Out-Null
+                    Write-Host " [OK] System %PATH% restored with default Windows directories." -ForegroundColor Green
+                } else {
+                    Write-Host " [OK] System %PATH% contains standard System32 directories." -ForegroundColor Green
+                }
+                Write-Log "WSH & System PATH environment fix applied successfully."
+            } catch {
+                Write-Host " [!] Error fixing WSH/PATH: $_" -ForegroundColor Red
+                Write-Log "Error fixing WSH/PATH: $_" "ERROR"
+            }
+        }
         "FlushDNS" {
             Write-Host "`n[+] Flushing DNS Resolver Cache..." -ForegroundColor Cyan
             Write-Log "Flushing DNS Cache..."
@@ -1129,6 +1279,7 @@ function Invoke-FullDiagnosticMode {
     Get-DriverDiagnostics
     Get-NetworkDiagnostics
     Get-NetworkExtendedInfo
+    Get-BSODCrashDiagnostics
     Get-EventLogs
     Get-ServicesAndProcesses
     Get-FirewallStatus
@@ -1233,7 +1384,7 @@ function Show-MainUI {
             "2"  { Get-HardwareInformation; Pause }
             "3"  { Get-DiskHealth; Pause }
             "4"  { Get-NetworkDiagnostics; Pause }
-            "5"  { Get-EventLogs; Pause }
+            "5"  { Get-BSODCrashDiagnostics; Get-EventLogs; Pause }
             "6"  { Get-ServicesAndProcesses; Pause }
             "7"  { Get-InstalledSoftware; Pause }
             "8"  { Invoke-WindowsRepair; Pause }
@@ -1262,6 +1413,9 @@ function Show-MainUI {
                 Write-Host " [K] Local User Account Management (net user / add / delete / admin)"
                 Write-Host " [L] Launch Admin Console / MMC Snap-in (services.msc, ncpa.cpl, etc.)"
                 Write-Host " [M] Windows / Office Activator"
+                Write-Host " [N] Repair WMI Repository & Core Services"
+                Write-Host " [O] Recover Wi-Fi & Bluetooth Services"
+                Write-Host " [P] Fix Windows Script Host & System PATH"
                 $SubChoice = Read-Host "Choice"
                 switch ($SubChoice.ToUpper()) {
                     "A" { Invoke-MaintenanceUtilities -Action "FlushDNS" }
@@ -1277,6 +1431,9 @@ function Show-MainUI {
                     "K" { Invoke-MaintenanceUtilities -Action "ManageUserAccount" }
                     "L" { Invoke-MaintenanceUtilities -Action "LaunchAdminTools" }
                     "M" { Invoke-MaintenanceUtilities -Action "ActivateWindowsOffice" }
+                    "N" { Invoke-MaintenanceUtilities -Action "RepairWMI" }
+                    "O" { Invoke-MaintenanceUtilities -Action "FixWiFiBluetooth" }
+                    "P" { Invoke-MaintenanceUtilities -Action "FixWSHAndPath" }
                 }
                 Pause
             }

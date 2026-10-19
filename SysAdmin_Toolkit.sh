@@ -488,6 +488,14 @@ get_event_logs() {
             echo ""
         fi
 
+        echo "--- SYSTEM CRASH & COREDUMP LOGS (/var/crash & coredumpctl) ---"
+        if [ -d /var/crash ]; then
+            ls -la /var/crash 2>/dev/null || true
+        fi
+        if has_cmd coredumpctl; then
+            coredumpctl list -n 10 2>/dev/null || true
+        fi
+        echo ""
         echo "--- RECENT SYSLOG ERRORS (/var/log) ---"
         if [ -f /var/log/syslog ]; then
             grep -iE 'error|crit|failed|fatal' /var/log/syslog | tail -n 30
@@ -931,6 +939,31 @@ invoke_maintenance_utilities() {
     local action="$1"
 
     case "$action" in
+        "RestartBluetooth")
+            echo -e "\n[+] Restarting Bluetooth & Wireless Stack..."
+            write_log "Restarting Bluetooth Service..."
+            if [ "$IS_ROOT" -eq 1 ]; then
+                if has_cmd systemctl; then
+                    systemctl restart bluetooth 2>/dev/null || true
+                fi
+                if has_cmd rfkill; then
+                    rfkill unblock all 2>/dev/null || true
+                fi
+                echo " [OK] Bluetooth service restarted and rfkill unblocked."
+            else
+                echo " [!] Root privileges required to restart Bluetooth service."
+            fi
+            ;;
+        "CheckEnvironment")
+            echo -e "\n[+] Auditing Environment & PATH Variables..."
+            write_log "Auditing Environment & PATH..."
+            echo "Current PATH: $PATH"
+            if [[ ":$PATH:" != *":/usr/bin:"* || ":$PATH:" != *":/bin:"* ]]; then
+                echo " [!] WARNING: Standard system binaries (/bin or /usr/bin) missing from PATH."
+            else
+                echo " [OK] Standard binary paths present in PATH."
+            fi
+            ;;
         "FlushDNS")
             echo -e "\n[+] Flushing DNS Resolver Cache..."
             write_log "Flushing DNS Cache..."
@@ -1291,6 +1324,8 @@ show_main_ui() {
                 echo " [J] Force Kill Process (kill -9 / pkill)"
                 echo " [K] Local User Account Management (useradd / userdel / usermod)"
                 echo " [L] Launch Admin Console / Diagnostic Tools (htop, nmtui, journalctl)"
+                echo " [M] Restart Bluetooth & Wireless Stack"
+                echo " [N] Check Environment & PATH Variables"
                 read -rp "Choice: " subchoice
                 case "${subchoice^^}" in
                     A) invoke_maintenance_utilities "FlushDNS" ;;
@@ -1305,6 +1340,8 @@ show_main_ui() {
                     J) invoke_maintenance_utilities "ForceKillProcess" ;;
                     K) invoke_maintenance_utilities "ManageUserAccount" ;;
                     L) invoke_maintenance_utilities "LaunchAdminTools" ;;
+                    M) invoke_maintenance_utilities "RestartBluetooth" ;;
+                    N) invoke_maintenance_utilities "CheckEnvironment" ;;
                 esac
                 pause_prompt
                 ;;
