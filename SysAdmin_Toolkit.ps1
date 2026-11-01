@@ -135,6 +135,22 @@ function Get-HardwareInformation {
             $HwReport += ""
         }
 
+        # Thermal Sensors & System Temperatures
+        $HwReport += "--- THERMAL SENSORS & SYSTEM TEMPERATURES ---"
+        try {
+            $Thermals = Get-CimInstance -Namespace "root/wmi" -ClassName "MSAcpi_ThermalZoneTemperature" -ErrorAction SilentlyContinue
+            if ($Thermals) {
+                foreach ($t in $Thermals) {
+                    $TempC = [math]::Round(($t.CurrentTemperature - 2732) / 10, 1)
+                    $HwReport += "Thermal Zone: $($t.InstanceName) | Temperature: $TempC°C"
+                }
+            } else {
+                $HwReport += "No MSAcpi_ThermalZoneTemperature sensors exposed by ACPI BIOS."
+            }
+        } catch {
+            $HwReport += "Thermal sensor query via ACPI/WMI unavailable."
+        }
+
         $HwReport | Out-File -FilePath $HwInfoPath -Encoding utf8
         Write-Host " [OK] Hardware information saved to $HwInfoPath" -ForegroundColor Green
         Write-Log "Hardware Information collected successfully."
@@ -166,6 +182,9 @@ function Get-DiskHealth {
             $PercentFree = if ($vol.Size -gt 0) { [math]::Round(($vol.FreeSpace / $vol.Size) * 100, 1) } else { 0 }
             $DiskReport += "Drive $($vol.DeviceID) [$($vol.VolumeName)] - FileSystem: $($vol.FileSystem)"
             $DiskReport += "  Size: $SizeGB GB | Free Space: $FreeGB GB ($PercentFree% Free)"
+            if ($vol.Size -gt 0 -and ($PercentFree -lt 10 -or $FreeGB -lt 5)) {
+                $DiskReport += "  [!] WARNING: Low disk space detected on Drive $($vol.DeviceID) ($FreeGB GB remaining, $PercentFree% free)."
+            }
             $DiskReport += ""
         }
 
@@ -187,6 +206,24 @@ function Get-DiskHealth {
                 $SizeGB = [math]::Round(($d.Size / 1GB), 2)
                 $DiskReport += "Disk $($d.Index): $($d.Model) ($SizeGB GB) - Status: $($d.Status)"
             }
+        }
+
+        # Storage Reliability Counters & NVMe Health
+        $DiskReport += "--- STORAGE RELIABILITY COUNTERS (NVMe / SSD HEALTH) ---"
+        try {
+            $Reliability = Get-PhysicalDisk | Get-StorageReliabilityCounter -ErrorAction SilentlyContinue
+            if ($Reliability) {
+                foreach ($rc in $Reliability) {
+                    $DiskReport += "Disk: $($rc.DeviceId) | Temperature: $($rc.Temperature)°C | Wear: $($rc.Wear)%"
+                    $DiskReport += "  Read Errors (Total): $($rc.ReadErrorsTotal) | Write Errors (Total): $($rc.WriteErrorsTotal)"
+                    $DiskReport += "  Power On Hours: $($rc.PowerOnHours)"
+                    $DiskReport += ""
+                }
+            } else {
+                $DiskReport += "Storage reliability counters unavailable or not supported for attached controller."
+            }
+        } catch {
+            $DiskReport += "Storage reliability counter check not supported on this Windows release."
         }
 
         $DiskReport | Out-File -FilePath $DiskInfoPath -Encoding utf8
@@ -875,7 +912,7 @@ function Get-StartupAndAccountInfo {
             $Report += $NetAcc
         } catch {
             $Report += "Unable to run net accounts."
-        }""
+        }
 
         # Startup Applications (Registry + Startup Folder)
         $Report += "--- STARTUP APPLICATIONS (REGISTRY & CIM) ---"
@@ -1037,7 +1074,7 @@ function Invoke-MaintenanceUtilities {
                 $SysPath = [Environment]::GetEnvironmentVariable("Path", "Machine")
                 if ($SysPath -notmatch "System32") {
                     $SysPath += ";C:\Windows\System32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\"
-                    [Environment]::GetEnvironmentVariable("Path", $SysPath, "Machine") | Out-Null
+                    [Environment]::SetEnvironmentVariable("Path", $SysPath, "Machine")
                     Write-Host " [OK] System %PATH% restored with default Windows directories." -ForegroundColor Green
                 } else {
                     Write-Host " [OK] System %PATH% contains standard System32 directories." -ForegroundColor Green

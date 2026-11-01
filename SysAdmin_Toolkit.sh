@@ -172,6 +172,28 @@ get_hardware_information() {
             echo "--- NVIDIA GPU STATUS ---"
             nvidia-smi 2>/dev/null || true
         fi
+        echo ""
+
+        echo "--- THERMAL SENSORS & SYSTEM TEMPERATURES ---"
+        if has_cmd sensors; then
+            sensors 2>/dev/null || true
+        elif [ -d /sys/class/thermal ]; then
+            for tz in /sys/class/thermal/thermal_zone*; do
+                if [ -d "$tz" ]; then
+                    local zone_type
+                    local zone_temp
+                    zone_type=$(cat "$tz/type" 2>/dev/null || echo "Unknown")
+                    zone_temp=$(cat "$tz/temp" 2>/dev/null || echo "0")
+                    if [ "$zone_temp" -gt 0 ] 2>/dev/null; then
+                        local temp_c
+                        temp_c=$((zone_temp / 1000))
+                        echo "Zone: $(basename "$tz") ($zone_type) | Temperature: ${temp_c}°C"
+                    fi
+                fi
+            done
+        else
+            echo "Thermal sensors not available."
+        fi
     } > "$hw_info_path"
 
     echo " [OK] Hardware information saved to $hw_info_path"
@@ -203,7 +225,7 @@ get_disk_health() {
         echo "--- PHYSICAL DISKS & SMART HEALTH ---"
         if has_cmd smartctl && [ "$IS_ROOT" -eq 1 ]; then
             local drive
-            for drive in /dev/sd[a-z] /dev/nvme[0-9]n1 /dev/vd[a-z]; do
+            for drive in /dev/sd[a-z] /dev/nvme[0-9]n1 /dev/vd[a-z] /dev/xvd[a-z]; do
                 if [ -b "$drive" ]; then
                     echo "------------------------------------------"
                     echo "SMART Status for $drive:"
@@ -212,6 +234,43 @@ get_disk_health() {
             done
         else
             echo " [!] smartctl (smartmontools) not installed or root privileges required for SMART checks."
+        fi
+        echo ""
+
+        echo "--- NVME STORAGE CONTROLLER HEALTH ---"
+        if has_cmd nvme && [ "$IS_ROOT" -eq 1 ]; then
+            local nvme_dev
+            for nvme_dev in /dev/nvme[0-9]; do
+                if [ -c "$nvme_dev" ]; then
+                    echo "NVMe Smart Log for $nvme_dev:"
+                    nvme smart-log "$nvme_dev" 2>/dev/null || true
+                fi
+            done
+        else
+            echo "nvme-cli not installed or requires root for raw NVMe smart-log queries."
+        fi
+        echo ""
+
+        echo "--- SOFTWARE RAID ARRAY STATUS (/proc/mdstat) ---"
+        if [ -f /proc/mdstat ]; then
+            cat /proc/mdstat
+        else
+            echo "No Software RAID (/proc/mdstat) detected."
+        fi
+        if has_cmd mdadm && [ "$IS_ROOT" -eq 1 ]; then
+            echo ""
+            mdadm --detail --scan 2>/dev/null || true
+        fi
+        echo ""
+
+        echo "--- LOGICAL VOLUME MANAGER (LVM) STATUS ---"
+        if has_cmd lvs && [ "$IS_ROOT" -eq 1 ]; then
+            echo "LVM Volumes:"
+            lvs 2>/dev/null || true
+            echo "Volume Groups:"
+            vgs 2>/dev/null || true
+        else
+            echo "LVM tools not installed or root privileges required."
         fi
     } > "$disk_info_path"
 
@@ -468,6 +527,69 @@ get_network_extended_info() {
 
     echo " [OK] Extended network info saved to $net_ext_path"
     write_log "Extended network info collected successfully."
+}
+
+get_bsod_crash_diagnostics() {
+    echo -e "\n[+] Checking System Crash Dumps & Kernel Panic History..."
+    write_log "Starting System Crash Dump & Kernel Panic analysis..."
+
+    local bsod_path="$WORK_DIR/BSODCrashDiagnostics.txt"
+
+    {
+        echo "=========================================="
+        echo "    SYSTEM CRASH DUMPS & PANIC ANALYSIS   "
+        echo "=========================================="
+        echo ""
+
+        echo "--- KERNEL CRASH DUMP DIRECTORY (/var/crash) ---"
+        if [ -d /var/crash ]; then
+            local crash_files
+            crash_files=$(ls -la /var/crash 2>/dev/null)
+            if [ -n "$crash_files" ]; then
+                echo "$crash_files"
+            else
+                echo " [OK] /var/crash exists but contains no dump files."
+            fi
+        else
+            echo " [OK] /var/crash directory does not exist."
+        fi
+        echo ""
+
+        echo "--- SYSTEMD COREDUMPCTL CRASH LOGS ---"
+        if has_cmd coredumpctl; then
+            coredumpctl list -n 15 --no-pager 2>/dev/null || echo "No coredumpctl crash records found."
+        else
+            echo "coredumpctl command not available."
+        fi
+        echo ""
+
+        echo "--- KERNEL PANICS & OOPS IN DMESG / JOURNAL ---"
+        if has_cmd journalctl; then
+            echo "Recent Kernel Panics / Oops from journalctl:"
+            journalctl -k -p 0..3 -n 40 --no-pager 2>/dev/null | grep -iE 'panic|oops|bug:|segfault|call trace' || echo " [OK] No kernel panics or oops found in recent journal logs."
+        elif has_cmd dmesg; then
+            echo "Recent Kernel Panics / Oops from dmesg:"
+            dmesg 2>/dev/null | grep -iE 'panic|oops|bug:|segfault|call trace' | tail -n 30 || echo " [OK] No kernel panics or oops found in dmesg."
+        fi
+        echo ""
+
+        echo "--- KDUMP / CRASH KERNEL STATUS ---"
+        if [ -f /sys/kernel/kexec_crash_loaded ]; then
+            local kdump_loaded
+            kdump_loaded=$(cat /sys/kernel/kexec_crash_loaded 2>/dev/null)
+            if [ "$kdump_loaded" = "1" ]; then
+                echo "Kdump Crash Kernel Status: LOADED (Active)"
+            else
+                echo "Kdump Crash Kernel Status: NOT LOADED"
+            fi
+        fi
+        if has_cmd kdumpctl; then
+            kdumpctl status 2>/dev/null || true
+        fi
+    } > "$bsod_path"
+
+    echo " [OK] Crash diagnostics report saved to $bsod_path"
+    write_log "Crash diagnostics completed successfully."
 }
 
 get_event_logs() {
@@ -1002,13 +1124,34 @@ invoke_maintenance_utilities() {
             fi
             ;;
         "ClearTemp")
-            echo -e "\n[+] Clearing Temporary Files & Caches..."
-            write_log "Clearing Temp files..."
+            echo -e "\n[+] Clearing Temporary Files, Caches & Vacuuming Systemd Logs..."
+            write_log "Clearing Temp files and vacuuming logs..."
             if [ "$IS_ROOT" -eq 1 ]; then
                 rm -rf /tmp/* /var/tmp/* 2>/dev/null || true
+                if has_cmd journalctl; then
+                    echo " Vacuuming systemd journal logs to max 7 days / 200MB..."
+                    journalctl --vacuum-time=7d --vacuum-size=200M 2>/dev/null || true
+                fi
             fi
             rm -rf "$HOME/.cache/*" 2>/dev/null || true
-            echo " [OK] Temporary files and user caches cleared."
+            echo " [OK] Temporary files, user caches cleared, and journal logs vacuumed."
+            ;;
+        "RecoverCoreServices")
+            echo -e "\n[+] Recovering Core Linux System Services & Daemons..."
+            write_log "Starting core service recovery..."
+            if [ "$IS_ROOT" -eq 1 ]; then
+                if has_cmd systemctl; then
+                    echo " Resetting failed systemd units..."
+                    systemctl reset-failed 2>/dev/null || true
+                    echo " Reloading systemd daemon configuration..."
+                    systemctl daemon-reload 2>/dev/null || true
+                    echo " Restarting system logging daemon..."
+                    systemctl restart systemd-journald 2>/dev/null || systemctl restart rsyslog 2>/dev/null || true
+                    echo " [OK] Core system services reloaded and reset."
+                fi
+            else
+                echo " [!] Root privileges required to recover core system services."
+            fi
             ;;
         "PurgePrintQueue")
             echo -e "\n[+] Purging Print Queue & Restarting CUPS..."
@@ -1197,6 +1340,7 @@ invoke_full_diagnostic_mode() {
     get_driver_diagnostics
     get_network_diagnostics
     get_network_extended_info
+    get_bsod_crash_diagnostics
     get_event_logs
     get_services_and_processes
     get_firewall_status
@@ -1268,7 +1412,7 @@ show_main_ui() {
         echo " [2]  Hardware Information     (CPU, RAM, Disks, GPU, Motherboard)"
         echo " [3]  Disk Health & Storage    (Volume Space, SMART Physical Disk Status)"
         echo " [4]  Network Diagnostics      (IP Config, Ping, DNS, Routes, Listening Ports)"
-        echo " [5]  Event Logs               (Journald Critical/Error Logs & Syslog)"
+        echo " [5]  Event Logs & Crashes     (Crash Dumps, Journald Critical/Error Logs)"
         echo " [6]  Services & Processes     (Failed Services, Top CPU/RAM Processes)"
         echo " [7]  Installed Software       (Export full software list to CSV/TXT)"
         echo " [8]  System & Package Repair  (Fix broken packages & systemd failed units)"
@@ -1296,7 +1440,7 @@ show_main_ui() {
             2)  get_hardware_information; pause_prompt ;;
             3)  get_disk_health; pause_prompt ;;
             4)  get_network_diagnostics; pause_prompt ;;
-            5)  get_event_logs; pause_prompt ;;
+            5)  get_bsod_crash_diagnostics; get_event_logs; pause_prompt ;;
             6)  get_services_and_processes; pause_prompt ;;
             7)  get_installed_software; pause_prompt ;;
             8)  invoke_system_repair; pause_prompt ;;
@@ -1326,6 +1470,7 @@ show_main_ui() {
                 echo " [L] Launch Admin Console / Diagnostic Tools (htop, nmtui, journalctl)"
                 echo " [M] Restart Bluetooth & Wireless Stack"
                 echo " [N] Check Environment & PATH Variables"
+                echo " [O] Recover Core Services & Reload Daemons"
                 read -rp "Choice: " subchoice
                 case "${subchoice^^}" in
                     A) invoke_maintenance_utilities "FlushDNS" ;;
@@ -1342,6 +1487,7 @@ show_main_ui() {
                     L) invoke_maintenance_utilities "LaunchAdminTools" ;;
                     M) invoke_maintenance_utilities "RestartBluetooth" ;;
                     N) invoke_maintenance_utilities "CheckEnvironment" ;;
+                    O) invoke_maintenance_utilities "RecoverCoreServices" ;;
                 esac
                 pause_prompt
                 ;;
