@@ -11,25 +11,25 @@ A comprehensive, all-in-one diagnostic, repair, and maintenance IT toolkit engin
 ## 🛠️ Key Features
 
 - **System Information:** Collects OS build/kernel, architecture, computer model, serial number, uptime, and registered user info.
-- **Hardware Information:** Detailed specifications for CPU (cores, clock speed), RAM (slots, capacity, speed), Motherboard, and GPU (resolution, driver version).
-- **Disk Health & Storage:** Logical volume space usage and physical disk SMART health status (`smartctl` on Linux).
+- **Hardware Information:** Detailed specifications for CPU (cores, clock speed), RAM (slots, capacity, speed), Motherboard, GPU (resolution, driver version), and Thermal Sensor zone temperatures (`sensors` / ACPI WMI).
+- **Disk Health & Storage:** Logical volume space usage with low-space alerts, physical disk SMART health status (`smartctl` on Linux), NVMe controller smart-log queries (`nvme` on Linux, `Get-StorageReliabilityCounter` on Windows), Software RAID array status (`/proc/mdstat`, `mdadm`), and LVM status.
 - **Device Driver & Kernel Diagnostics:** Audits Plug and Play hardware devices / kernel `dmesg` logs for driver errors, missing drivers, and hardware issues.
 - **Network Diagnostics:** IP configuration, active network adapters, ICMP ping tests, DNS server checks, routing table, ARP cache, and listening ports.
 - **Extended Network Check:** Public IP address lookup, WAN domain resolution & latency checks, network path tracing (`tracert` / `traceroute`), and Hosts file (`/etc/hosts` or `C:\Windows\System32\drivers\etc\hosts`) security audit for unauthorized redirects.
 - **SMB Shares & Security:** Audits active network shares, active SMB sessions, and checks for insecure SMBv1/legacy protocol configurations.
-- **BSOD Crash Dump & BugCheck Analyzer:** Audits Windows minidump crash files (`C:\Windows\Minidump\*.dmp`), full memory dumps, and parses Event ID 1001 / 6008 BugCheck logs (or `/var/crash` and `coredumpctl` on Linux).
+- **Crash Dump & BugCheck Analyzer:** Audits Windows minidump crash files (`C:\Windows\Minidump\*.dmp`), full memory dumps, and parses Event ID 1001 / 6008 BugCheck logs on Windows; audits Linux kernel crash dumps (`/var/crash`), systemd coredumps (`coredumpctl`), kernel panics/oops, and kdump status on Linux, exported to `BSODCrashDiagnostics.txt`.
 - **Event Logs & Journald:** Queries recent Critical and Error entries across system logs (`journalctl` / `syslog` / `auth.log` on Linux; System, Application, and Security logs on Windows).
 - **Services & Processes:** Identifies stopped/failed automatic services and highlights top CPU and Memory consuming processes.
 - **Installed Software:** Generates a full inventory of installed software across package managers (`dpkg`, `rpm`, `pacman`, `snap`, `flatpak`, Windows Registry) and exports to CSV and TXT formats.
 - **System & Package Repair:** Executes `DISM RestoreHealth` + `sfc /scannow` on Windows, or package manager repairs (`dpkg --configure -a`, `apt install -f`, `systemctl reset-failed`) on Linux.
 - **Filesystem / CHKDSK Scan:** Read-only health check for disk and volume integrity (`e2fsck` read-only check on Linux).
-- **Firewall Status:** Status of Firewall profiles (`UFW`, `Firewalld`, `iptables` on Linux; Domain/Private/Public on Windows) along with active rule summaries.
+- **Firewall Status:** Status of Firewall profiles (`UFW`, `Firewalld`, `iptables`, `nftables` on Linux; Domain/Private/Public on Windows) along with active rule summaries.
 - **Update History:** Displays installed hotfixes and package update transaction records sorted by date.
 - **Security & Licensing Diagnostics:** Inspects OS licensing health, Defender/ClamAV status, BitLocker/LUKS volume encryption, SELinux/AppArmor, and TPM health.
 - **Startup & Accounts Info:** Audits startup applications, local user accounts, password & account lockout policy settings (`net accounts` / `chage`), sudo/administrator group members, and desktop autostart items.
 - **Battery Report:** Generates an HTML battery health and capacity report.
 - **Full Diagnostic Mode:** Runs all diagnostic functions sequentially and creates a timestamped report directory.
-- **Quick Maintenance Utilities:** Quick actions to Flush DNS, Release & Renew IP, Reset Network Stack, Clear Temporary Files, Purge Print Queue (`CUPS`), Restart Update Services, Create System Snapshot (`Timeshift`/`Snapper`), Update Antivirus Signatures, Reset Package Manager Cache, Force Kill Process, Local User Account Management, Administrative MMC Snap-ins & Diagnostic Tools Launcher, Windows / Office Activator, **WMI Repository Repair & Core Service Recovery**, **Wi-Fi & Bluetooth Adapter Recovery**, and **Windows Script Host (WSH) & System PATH Environment Fixer**.
+- **Quick Maintenance Utilities:** Quick actions to Flush DNS, Release & Renew IP, Reset Network Stack, Clear Temporary Files & Vacuum Journal Logs, Purge Print Queue (`CUPS` / Spooler), Restart Update Services, Create System Snapshot (`Timeshift`/`Snapper` / Restore Point), Update Antivirus Signatures, Reset Package Manager Cache, Force Kill Process, Local User Account Management, Administrative MMC Snap-ins & Diagnostic Tools Launcher, Windows / Office Activator, **WMI Repository Repair & Core Service Recovery**, **Wi-Fi & Bluetooth Adapter Recovery**, and **Windows Script Host (WSH) & System PATH Environment Fixer**.
 - **Open Report Folder:** Fast 1-click access to all generated reports (`xdg-open` on Linux).
 - **Automated Task Integration:** Automated daily diagnostic task setup via Task Scheduler (Windows) or Cron (Linux).
 
